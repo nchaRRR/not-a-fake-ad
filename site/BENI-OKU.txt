@@ -1,0 +1,14 @@
+Not a Fake Ad — nimoriq.com sayfaları
+
+1) cPanel → Dosya Yöneticisi → public_html.
+2) Bu zip'i public_html'e yükle ve "Extract" ile aç. Şu iki klasör gelir:
+     not-a-fake-ad-privacy/   gizlilik politikası  → https://nimoriq.com/not-a-fake-ad-privacy/
+     not-a-fake-ad-support/   destek sayfası       → https://nimoriq.com/not-a-fake-ad-support/
+3) Dokunma: index.html, app-ads.txt, ads.txt ve diğer oyunların klasörleri.
+4) İki adresi tarayıcıda aç, sayfalar geliyorsa tamam.
+
+Mağazalara yazılacaklar:
+  App Store Connect → App Privacy → Privacy Policy URL: https://nimoriq.com/not-a-fake-ad-privacy/
+  App Store Connect → sürüm sayfası → Support URL:      https://nimoriq.com/not-a-fake-ad-support/
+  Play Console → App content → Privacy policy:         https://nimoriq.com/not-a-fake-ad-privacy/
+  Play Console → Data safety → Account deletion URL:   https://nimoriq.com/not-a-fake-ad-privacy/#silme

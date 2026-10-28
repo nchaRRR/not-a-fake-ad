@@ -1,0 +1,1213 @@
+<title>Not a Fake Ad</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Nunito:wght@600;700;800&display=swap">
+<style>
+  /* Layout: full-bleed WebGL canvas; chunky sticker cards float over it. One deliberate bright look in every theme. */
+  :root {
+    --ink: #2b2140;
+    --ink-soft: #5d5172;
+    --paper: #fff7ef;
+    --line: #ecd9cb;
+    --blue: #2f7cf6;
+    --blue-deep: #1d5bc4;
+    --red: #e8453c;
+    --red-deep: #b52f28;
+    --orange: #ff9628;
+    --gold: #ffbe2e;
+    --gold-deep: #c98a00;
+    --lilac: #8a78f0;
+    --font-display: "Baloo 2", ui-rounded, "Arial Rounded MT Bold", system-ui, sans-serif;
+    --font-body: "Nunito", ui-rounded, system-ui, -apple-system, "Segoe UI", sans-serif;
+    color-scheme: light;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: #ffd9c4;
+    color: var(--ink);
+    font-family: var(--font-body);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  /* ---------- HUD ---------- */
+  #hud {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .hud-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .hud-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--paper);
+    border: 3px solid var(--ink);
+    border-radius: 999px;
+    padding: 2px 12px 2px 6px;
+    font-family: var(--font-display);
+    font-size: 20px;
+    line-height: 1.3;
+    box-shadow: 0 3px 0 var(--ink);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .chip-level { padding: 2px 14px; font-size: 18px; }
+  .bar {
+    width: min(180px, 100%);
+    height: 12px;
+    border: 3px solid var(--ink);
+    border-radius: 99px;
+    background: var(--paper);
+    overflow: hidden;
+  }
+  #hud-progress { height: 100%; background: var(--blue); transform-origin: left; transform: scaleX(0); }
+  .coin-icon {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #fff2b8 0 18%, var(--gold) 20% 62%, var(--gold-deep) 64%);
+    box-shadow: inset 0 0 0 2px var(--gold-deep);
+  }
+  .icon-btn {
+    pointer-events: auto;
+    width: 46px;
+    height: 46px;
+    flex: none;
+    border-radius: 14px;
+    border: 3px solid var(--ink);
+    background: var(--paper);
+    box-shadow: 0 3px 0 var(--ink);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .icon-btn svg { width: 18px; height: 18px; fill: var(--ink); }
+  #hud-hint {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 12vh);
+    text-align: center;
+    font-family: var(--font-display);
+    font-size: 22px;
+    color: var(--ink);
+    transition: opacity 0.6s ease;
+  }
+  #hud-hint .hand {
+    display: block;
+    margin: 0 auto 6px;
+    width: 64px;
+    height: 10px;
+    border-radius: 99px;
+    background: var(--ink);
+    opacity: 0.25;
+    position: relative;
+  }
+  #hud-hint .hand::after {
+    content: "";
+    position: absolute;
+    top: -9px;
+    left: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--blue);
+    border: 3px solid var(--ink);
+    animation: swipe 1.2s ease-in-out infinite alternate;
+  }
+  #hud-hint.fade { opacity: 0; }
+  /* First-time drag lesson: a bigger, card-style hint. */
+  #hud-hint.teach #hint-text {
+    display: inline-block; max-width: min(86vw, 320px); font-size: 24px; line-height: 1.15; text-wrap: balance;
+    background: var(--gold); border: 3px solid var(--ink); border-radius: 16px; padding: 8px 14px 6px; box-shadow: 0 4px 0 var(--ink);
+  }
+  #hud-hint.teach .hand { transform: scale(1.5); margin-bottom: 18px; }
+  @keyframes swipe { from { transform: translateX(-10px); } to { transform: translateX(40px); } }
+
+  /* Parody caption, styled like the ads it mocks. */
+  #banner {
+    position: fixed;
+    left: 50%;
+    top: calc(env(safe-area-inset-top, 0px) + 92px);
+    width: min(calc(100% - 32px), 360px);
+    text-align: center;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 24px;
+    line-height: 1.1;
+    color: #fff;
+    background: var(--red);
+    border: 3px solid var(--ink);
+    border-radius: 14px;
+    padding: 8px 14px 6px;
+    box-shadow: 0 4px 0 var(--ink);
+    pointer-events: none;
+    opacity: 0;
+    transform: translateX(-50%) rotate(-2deg);
+    text-wrap: balance;
+  }
+  #banner.go { animation: banner 2.8s ease forwards; }
+  @keyframes banner {
+    0% { opacity: 0; transform: translateX(-50%) rotate(-2deg) scale(0.6); }
+    10% { opacity: 1; transform: translateX(-50%) rotate(-2deg) scale(1.08); }
+    16% { transform: translateX(-50%) rotate(-2deg) scale(1); }
+    82% { opacity: 1; }
+    100% { opacity: 0; transform: translateX(-50%) rotate(-2deg) translateY(-12px); }
+  }
+
+  #popups {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 34%;
+    display: grid;
+    justify-items: center;
+    pointer-events: none;
+  }
+  .popup {
+    grid-area: 1 / 1;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 40px;
+    color: #fff;
+    -webkit-text-stroke: 3px var(--ink);
+    paint-order: stroke fill;
+    text-shadow: 0 4px 0 var(--ink);
+    animation: rise 1s ease-out forwards;
+    white-space: nowrap;
+    text-transform: uppercase;
+  }
+  .popup.good { color: #9cc4ff; }
+  .popup.bad { color: #ffb0a8; }
+  .popup.gun { color: #ffd08a; font-size: 30px; }
+  @keyframes rise {
+    0% { transform: translateY(14px) scale(0.6); opacity: 0; }
+    18% { transform: translateY(0) scale(1.15); opacity: 1; }
+    100% { transform: translateY(-56px) scale(1); opacity: 0; }
+  }
+
+  /* ---------- Screens ---------- */
+  .screen {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding-block: calc(env(safe-area-inset-top, 0px) + 20px) calc(env(safe-area-inset-bottom, 0px) + 20px);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    overflow-y: auto;
+  }
+  .screen-dim { background: rgba(43, 33, 64, 0.38); }
+  .card {
+    width: min(100%, 380px);
+    background: var(--paper);
+    border: 3px solid var(--ink);
+    border-radius: 24px;
+    box-shadow: 0 6px 0 var(--ink);
+    padding: 22px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .home-top {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    left: max(16px, env(safe-area-inset-left, 0px));
+    right: max(16px, env(safe-area-inset-right, 0px));
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .ad-tag {
+    display: inline-block;
+    font-family: var(--font-body);
+    font-weight: 800;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: var(--gold);
+    color: var(--ink);
+    border: 3px solid var(--ink);
+    border-radius: 8px;
+    padding: 2px 8px;
+    transform: rotate(-3deg);
+  }
+  .logo-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .logo {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: clamp(50px, 16vw, 80px);
+    line-height: 0.86;
+    text-align: center;
+    color: #fff;
+    -webkit-text-stroke: 4px var(--ink);
+    paint-order: stroke fill;
+    text-shadow: 0 6px 0 var(--ink);
+    transform: rotate(-3deg);
+  }
+  .logo .strike { position: relative; display: inline-block; color: var(--red); }
+  .logo .strike::after {
+    content: "";
+    position: absolute;
+    left: -4%;
+    right: -4%;
+    top: 50%;
+    height: 9px;
+    background: var(--ink);
+    border-radius: 9px;
+    transform: rotate(-8deg);
+  }
+  .tagline {
+    margin: 0;
+    max-width: 30ch;
+    text-align: center;
+    font-weight: 800;
+    font-size: 16px;
+    color: var(--ink);
+    background: var(--paper);
+    border: 3px solid var(--ink);
+    border-radius: 12px;
+    padding: 6px 12px;
+    text-wrap: balance;
+  }
+  .world-line { margin: 0; display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; }
+  #home-world {
+    font-family: var(--font-display); font-weight: 800; font-size: 18px; color: var(--ink);
+    background: var(--paper); border: 3px solid var(--ink); border-radius: 999px; padding: 2px 14px 0;
+  }
+  .kind-tag {
+    font-family: var(--font-display); font-weight: 800; font-size: 16px; color: #fff;
+    background: var(--red); border: 3px solid var(--ink); border-radius: 999px; padding: 2px 12px 0; transform: rotate(-3deg);
+  }
+  .home-bottom { width: min(100%, 380px); display: flex; flex-direction: column; gap: 12px; margin-top: 8vh; }
+
+  .btn {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 24px;
+    line-height: 1;
+    border: 3px solid var(--ink);
+    border-radius: 18px;
+    padding: 16px 20px 14px;
+    cursor: pointer;
+    color: #fff;
+    background: var(--blue);
+    box-shadow: inset 0 -5px 0 var(--blue-deep), 0 4px 0 var(--ink);
+    transition: transform 0.06s ease, box-shadow 0.06s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .btn:active:not(:disabled) { transform: translateY(3px); box-shadow: inset 0 -3px 0 var(--blue-deep), 0 1px 0 var(--ink); }
+  .btn-big { font-size: 32px; padding: 20px; }
+  .btn-gold { background: var(--orange); box-shadow: inset 0 -5px 0 #cf6f0e, 0 4px 0 var(--ink); }
+  .btn-gold:active:not(:disabled) { box-shadow: inset 0 -3px 0 #cf6f0e, 0 1px 0 var(--ink); }
+  .btn-plain { background: var(--paper); color: var(--ink); box-shadow: inset 0 -5px 0 var(--line), 0 4px 0 var(--ink); }
+  .btn-plain:active:not(:disabled) { box-shadow: inset 0 -3px 0 var(--line), 0 1px 0 var(--ink); }
+  .btn:disabled { cursor: default; filter: grayscale(0.8); opacity: 0.6; }
+  .btn:focus-visible, .icon-btn:focus-visible, .text-btn:focus-visible { outline: 3px solid var(--lilac); outline-offset: 3px; }
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .text-btn {
+    pointer-events: auto;
+    font-family: var(--font-body);
+    font-weight: 800;
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--paper);
+    border: 3px solid var(--ink);
+    border-radius: 999px;
+    padding: 6px 12px;
+    box-shadow: 0 3px 0 var(--ink);
+    cursor: pointer;
+  }
+  .text-btn[aria-pressed="true"] { background: var(--line); }
+  .toggles { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .toggles .text-btn { padding: 6px 10px; font-size: 13px; }
+  .toggles { align-items: center; }
+  .toggles .icon-btn { width: 40px; height: 40px; border-radius: 12px; }
+  .toggles .icon-btn svg { width: 22px; height: 22px; }
+  .btn-row.three { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .btn-row.three .btn { font-size: 18px; padding: 14px 6px 12px; position: relative; }
+  .btn-teal { background: #1fae9f; box-shadow: inset 0 -5px 0 #138376, 0 4px 0 var(--ink); }
+  .btn-teal:active:not(:disabled) { box-shadow: inset 0 -3px 0 #138376, 0 1px 0 var(--ink); }
+  .missions-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .mission { display: flex; align-items: center; gap: 10px; border: 3px solid var(--ink); border-radius: 16px; background: #fff; padding: 10px 12px; }
+  .mission.claimed { opacity: 0.55; }
+  .mission-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .mission-text b { font-size: 15px; line-height: 1.25; }
+  .mission-text small { display: inline-flex; align-items: center; gap: 4px; font-weight: 800; font-size: 12px; color: var(--ink-soft); }
+  .mission-text small .coin-icon { width: 13px; height: 13px; }
+  .mission-bar { width: 100%; height: 10px; border-width: 2px; }
+  .mission-bar div { height: 100%; background: #1fae9f; transform-origin: left; }
+  .mission-count { font-family: var(--font-display); font-weight: 800; font-size: 15px; color: var(--ink-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tabs button { font-size: 14px; }
+  .pack-price { font-family: var(--font-display); font-weight: 800; }
+  .weapon-icon.w-noads::before { content: "AD"; left: 50%; top: 50%; width: auto; height: auto; margin: 0; transform: translate(-50%, -50%); background: none; font-family: var(--font-body); font-weight: 900; font-size: 13px; color: var(--ink); }
+  .weapon-icon.w-noads::after { content: ""; position: absolute; left: 4px; right: 4px; top: 50%; height: 3px; background: var(--red); transform: rotate(-30deg); border-radius: 3px; }
+  .offer-card { align-items: center; text-align: center; }
+  .offer-items { display: flex; flex-direction: column; gap: 8px; font-family: var(--font-display); font-weight: 800; font-size: 22px; }
+  .offer-items > span { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  .swatch.small { width: 26px; height: 26px; border-width: 2px; }
+  .home-left { display: flex; align-items: center; gap: 8px; }
+  .wheel-btn { position: relative; width: 44px; height: 44px; }
+  .mini-wheel {
+    width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--ink);
+    background: conic-gradient(#2f7cf6 0 45deg, #ff9628 0 90deg, #7a5cf0 0 135deg, #1fae9f 0 180deg, #e8453c 0 225deg, #2f7cf6 0 270deg, #ff9628 0 315deg, #ffbe2e 0 360deg);
+    animation: slowspin 6s linear infinite;
+  }
+  @keyframes slowspin { to { transform: rotate(360deg); } }
+  .wheel-card { align-items: center; text-align: center; }
+  .wheel-card .btn, .offer-card .btn, .ad-card .btn { align-self: stretch; }
+  .wheel-wrap { position: relative; width: min(78vw, 300px); aspect-ratio: 1; max-width: 100%; }
+  .wheel {
+    position: absolute; inset: 0; border-radius: 50%; border: 5px solid var(--ink);
+    box-shadow: 0 6px 0 var(--ink), inset 0 0 0 6px rgba(255, 255, 255, 0.35);
+    transition: transform 3.6s cubic-bezier(0.12, 0.75, 0.18, 1);
+  }
+  .wheel-label { position: absolute; inset: 0; display: flex; justify-content: center; padding-top: 9%; pointer-events: none; }
+  .wheel-label b {
+    font-family: var(--font-display); font-weight: 800; font-size: clamp(16px, 5vw, 22px); line-height: 1; color: #fff;
+    -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; display: flex; flex-direction: column; align-items: center;
+  }
+  .wheel-label b small { font-size: 0.6em; }
+  .wheel-label.jackpot b { color: var(--ink); -webkit-text-stroke: 0; font-size: clamp(17px, 5.4vw, 24px); }
+  .wheel-pointer {
+    position: absolute; left: 50%; top: -14px; z-index: 2; margin-left: -16px; width: 0; height: 0;
+    border-left: 16px solid transparent; border-right: 16px solid transparent; border-top: 30px solid var(--red);
+    filter: drop-shadow(0 3px 0 var(--ink));
+  }
+  .wheel-hub {
+    position: absolute; left: 50%; top: 50%; width: 18%; aspect-ratio: 1; transform: translate(-50%, -50%);
+    border-radius: 50%; background: var(--paper); border: 4px solid var(--ink);
+  }
+  .wheel-result { display: flex; flex-direction: column; align-items: center; }
+  .wheel-result small { font-weight: 800; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+  .wheel-result strong { font-family: var(--font-display); font-size: 44px; line-height: 1.05; }
+  @media (prefers-reduced-motion: reduce) { .mini-wheel { animation: none; } .wheel { transition-duration: 0.8s; } }
+  .tabs.two { grid-template-columns: 1fr 1fr; }
+  .trophy-list { list-style: none; margin: 0; padding: 0 2px 0 0; display: flex; flex-direction: column; gap: 8px; max-height: min(50vh, 420px); overflow-y: auto; }
+  .trophy { display: flex; align-items: center; gap: 10px; border: 3px solid var(--ink); border-radius: 14px; background: #fff; padding: 8px 10px; opacity: 0.75; }
+  .trophy.have { opacity: 1; background: #fff6dc; }
+  .trophy-icon {
+    flex: none; width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--ink);
+    background: radial-gradient(circle at 35% 35%, #fff2b8 0 18%, var(--gold) 20% 60%, var(--gold-deep) 62%);
+  }
+  .trophy:not(.have) .trophy-icon { filter: grayscale(1); opacity: 0.5; }
+  .trophy-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .trophy-text b { font-size: 14px; line-height: 1.2; }
+  .trophy-text small { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+  .trophy-state { font-family: var(--font-display); font-weight: 800; font-size: 14px; color: var(--ink-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .trophy.have .trophy-state { color: #1fae9f; font-size: 20px; }
+  .record { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; border-bottom: 2px solid var(--line); padding: 10px 4px; font-weight: 800; }
+  .record strong { font-family: var(--font-display); font-size: 24px; font-variant-numeric: tabular-nums; }
+  .trophy-toast {
+    position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 70px); z-index: 30; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 10px; width: min(calc(100% - 32px), 340px);
+    background: var(--paper); border: 3px solid var(--ink); border-radius: 16px; padding: 8px 12px; box-shadow: 0 4px 0 var(--ink);
+    pointer-events: none;
+  }
+  .trophy-toast.go { animation: toast 3.2s ease forwards; }
+  .trophy-toast div { display: flex; flex-direction: column; min-width: 0; }
+  .trophy-toast small { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+  .trophy-toast b { font-family: var(--font-display); font-size: 18px; line-height: 1.15; }
+  @keyframes toast { 0% { opacity: 0; transform: translate(-50%, -16px); } 10%, 85% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -10px); } }
+  .field-label { font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: -8px; }
+  .code-box {
+    width: 100%; resize: none; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.35;
+    border: 3px solid var(--ink); border-radius: 12px; padding: 8px; background: #fff; color: var(--ink); word-break: break-all;
+    -webkit-user-select: text; user-select: text;
+  }
+  .code-box:focus-visible { outline: 3px solid var(--lilac); outline-offset: 2px; }
+  .form-error { margin: 0; font-weight: 800; font-size: 13px; color: var(--red); }
+  .set-h { margin: 4px 0 -4px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+  .set-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: var(--line); border: 3px solid var(--ink); border-radius: 14px; padding: 4px; }
+  .seg-btn { font-family: var(--font-display); font-weight: 800; font-size: 16px; color: var(--ink-soft); background: transparent; border: 0; border-radius: 10px; padding: 7px 4px 5px; cursor: pointer; }
+  .seg-btn[aria-pressed="true"] { background: var(--paper); color: var(--ink); box-shadow: 0 2px 0 var(--ink); }
+  .set-list { display: flex; flex-direction: column; border: 3px solid var(--ink); border-radius: 14px; overflow: hidden; background: #fff; }
+  .set-row {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; width: 100%;
+    font-family: var(--font-body); font-weight: 800; font-size: 15px; color: var(--ink);
+    background: #fff; border: 0; border-bottom: 2px solid var(--line); padding: 12px 14px; cursor: pointer;
+  }
+  .set-list .set-row:last-child { border-bottom: 0; }
+  .set-row small { font-weight: 700; font-size: 12px; color: var(--ink-soft); }
+  .set-row.danger { color: var(--red); border: 3px solid var(--red); border-radius: 14px; align-items: center; }
+  .set-row:focus-visible, .seg-btn:focus-visible { outline: 3px solid var(--lilac); outline-offset: 2px; }
+  .reset-confirm p { margin: 0 0 8px; text-align: center; font-weight: 800; }
+  .btn-danger { background: var(--red); box-shadow: inset 0 -5px 0 var(--red-deep), 0 4px 0 var(--ink); }
+  .set-version { margin: 0; text-align: center; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+  .account-card { gap: 0; }
+  .acc-panel { display: flex; flex-direction: column; gap: 12px; }
+  .acc-panel[hidden] { display: none; }
+  .acc-panel h2 { text-align: center; }
+  .acc-hero { display: grid; place-items: center; margin: -4px 0 -6px; }
+  .acc-hero svg { filter: drop-shadow(0 4px 0 rgba(43,33,64,0.18)); animation: accBob 2.4s ease-in-out infinite; }
+  @keyframes accBob { 50% { transform: translateY(-5px); } }
+  .acc-bonus { margin: 0 auto; display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 999px; background: #fff1c9; border: 2px solid #f0b429; font-weight: 800; font-size: 14px; }
+  .acc-bonus b { font-family: var(--font-display); font-size: 18px; }
+  .acc-bonus[hidden] { display: none; }
+  .btn-auth { font-size: 19px; padding: 14px 16px 12px; gap: 10px; }
+  .btn-auth.apple { background: #111; box-shadow: inset 0 -5px 0 #000, 0 4px 0 var(--ink); }
+  .btn-auth.google { background: #fff; color: var(--ink); box-shadow: inset 0 -5px 0 var(--line), 0 4px 0 var(--ink); }
+  .btn-auth.email { background: var(--lilac); box-shadow: inset 0 -5px 0 #6a58d0, 0 4px 0 var(--ink); }
+  .btn-auth[hidden] { display: none; }
+  .acc-fine { margin: 0; text-align: center; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+  .acc-fine.left { text-align: left; margin-top: -6px; }
+  .acc-fine[hidden] { display: none; }
+  .text-input { width: 100%; font: 700 17px var(--font-body); color: var(--ink); background: #fff; border: 3px solid var(--ink); border-radius: 14px; padding: 12px 14px; -webkit-user-select: text; user-select: text; }
+  .text-input:focus-visible { outline: 3px solid var(--lilac); outline-offset: 2px; }
+  .acc-links { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .link-btn { background: none; border: 0; padding: 4px 0; font: 800 14px var(--font-body); color: var(--blue-deep); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .link-btn[hidden] { display: none; }
+  .link-btn:disabled { color: var(--ink-soft); text-decoration: none; cursor: default; }
+  .code-input { font: 800 30px var(--font-display); letter-spacing: 0.35em; text-align: center; padding: 10px 8px 6px; }
+  .acc-choice { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; background: #fff; border: 3px solid var(--ink); border-radius: 16px; padding: 12px 16px; box-shadow: 0 4px 0 var(--ink); cursor: pointer; color: var(--ink); }
+  .acc-choice small { font: 800 12px var(--font-body); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); }
+  .acc-choice b { font-family: var(--font-display); font-size: 22px; }
+  .acc-choice:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  .acc-me { display: flex; align-items: center; gap: 12px; background: #fff; border: 3px solid var(--ink); border-radius: 16px; padding: 12px 14px; }
+  .acc-me b { display: block; font-size: 16px; word-break: break-all; }
+  .acc-me small { font-weight: 700; font-size: 12px; color: var(--ink-soft); }
+  .acc-avatar { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--blue); color: #fff; font: 800 22px var(--font-display); border: 3px solid var(--ink); }
+  .set-row.danger[hidden] { display: none; }
+  .prose p { margin: 0; font-weight: 700; line-height: 1.45; color: var(--ink); }
+  .prose .muted { color: var(--ink-soft); font-size: 13px; }
+  .credits { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.4; }
+
+  .card h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 34px;
+    line-height: 1;
+    text-align: center;
+    text-wrap: balance;
+  }
+  .card .lede { margin: 0; text-align: center; font-weight: 700; color: var(--ink-soft); text-wrap: balance; }
+  .reward {
+    border: 3px solid var(--ink);
+    border-radius: 16px;
+    background: #fff;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .reward small { font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+  .reward strong {
+    font-family: var(--font-display);
+    font-size: 46px;
+    line-height: 1.05;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-variant-numeric: tabular-nums;
+  }
+  .reward .coin-icon { width: 30px; height: 30px; }
+
+  .shop-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .shop-head h2 { text-align: left; }
+  #shop-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .upgrade {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 3px solid var(--ink);
+    border-radius: 18px;
+    background: #fff;
+    padding: 10px 10px 10px 12px;
+  }
+  .upgrade-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .upgrade h3 { margin: 0; font-family: var(--font-display); font-size: 20px; line-height: 1.15; }
+  .lvl-tag {
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 800;
+    color: #fff;
+    background: var(--blue);
+    border-radius: 6px;
+    padding: 1px 6px;
+    vertical-align: 3px;
+  }
+  .upgrade p { margin: 0; font-size: 13px; font-weight: 700; color: var(--ink-soft); line-height: 1.3; }
+  .upgrade p.next { color: var(--blue-deep); }
+  .btn-buy { font-size: 19px; padding: 11px 12px 9px; flex: none; min-width: 92px; }
+  .btn-ad { background: #7a5cf0; box-shadow: inset 0 -5px 0 #5a3fc8, 0 4px 0 var(--ink); font-size: 21px; }
+  .btn-ad:active:not(:disabled) { box-shadow: inset 0 -3px 0 #5a3fc8, 0 1px 0 var(--ink); }
+  .ad-chip {
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: var(--ink);
+    background: var(--gold);
+    border: 2px solid var(--ink);
+    border-radius: 6px;
+    padding: 1px 6px;
+  }
+  .screen-ad { background: rgba(20, 14, 32, 0.82); z-index: 20; }
+  .ad-card { align-items: center; text-align: center; }
+  .ad-count {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 28px;
+    font-variant-numeric: tabular-nums;
+  }
+  .btn-pass { background: #7a5cf0; box-shadow: inset 0 -5px 0 #5a3fc8, 0 4px 0 var(--ink); position: relative; }
+  .btn-pass:active:not(:disabled) { box-shadow: inset 0 -3px 0 #5a3fc8, 0 1px 0 var(--ink); }
+  .badge-dot {
+    position: absolute; top: -10px; right: -8px; min-width: 26px; height: 26px; padding: 0 6px;
+    display: grid; place-items: center; font-family: var(--font-body); font-size: 13px; font-weight: 800;
+    color: #fff; background: var(--red); border: 3px solid var(--ink); border-radius: 999px;
+  }
+  .xp-tag { font-family: var(--font-body); font-weight: 800; font-size: 13px; color: #5a3fc8; }
+  .xp-tag:empty { display: none; }
+  /* ---------- Season pass ---------- */
+  .pass-card { gap: 10px; padding-top: 14px; overflow: hidden; }
+  .pass-hero {
+    margin: -14px -18px 0; padding: 14px 18px 16px; color: #fff;
+    background:
+      radial-gradient(circle at 85% 0%, rgba(255, 79, 216, 0.55), transparent 55%),
+      radial-gradient(circle at 0% 100%, rgba(47, 124, 246, 0.6), transparent 60%),
+      linear-gradient(135deg, #2b1d6b, #5a3fc8 60%, #8a4fd8);
+    border-bottom: 3px solid var(--ink);
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .pass-hero-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .pass-kicker { font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #ffd34d; }
+  .chip-hero { font-size: 17px; box-shadow: 0 2px 0 var(--ink); color: var(--ink); }
+  .pass-hero h2 {
+    margin: 0; text-align: left; font-size: 28px; line-height: 1; color: #fff;
+    -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill; text-shadow: 0 3px 0 var(--ink); text-wrap: balance;
+  }
+  .pass-days {
+    align-self: flex-start; display: inline-flex; align-items: center; gap: 5px; margin-top: 2px;
+    font-size: 12px; font-weight: 800; background: rgba(0, 0, 0, 0.28); border-radius: 999px; padding: 3px 10px;
+  }
+  .pass-days::before { content: ""; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #fff; box-sizing: border-box; }
+  .pass-progress { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+  .pass-medal {
+    flex: none; width: 58px; height: 58px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 35% 30%, #fff4c2, #ffbe2e 55%, #c98a00); border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink); color: var(--ink);
+  }
+  .pass-medal small { font-size: 7.5px; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1; }
+  .pass-medal b { font-family: var(--font-display); font-size: 26px; line-height: 1; }
+  .pass-xpwrap { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; align-items: center; }
+  .pass-tier { font-family: var(--font-display); font-weight: 800; font-size: 15px; }
+  .pass-xp-text { font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; opacity: 0.9; }
+  .pass-bar { grid-column: 1 / -1; grid-row: 2; height: 14px; border-radius: 99px; background: rgba(0, 0, 0, 0.35); border: 2px solid var(--ink); overflow: hidden; }
+  #pass-xp { height: 100%; background: linear-gradient(90deg, #ffd34d, #ff9628); transform-origin: left; transform: scaleX(0); transition: transform 0.4s ease; }
+  .pass-cols { display: grid; grid-template-columns: 1fr 44px 1fr; gap: 6px; align-items: center; }
+  .pass-cols span { text-align: center; font-size: 11px; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; }
+  .col-free { color: var(--ink-soft); }
+  .col-prem { display: inline-flex; justify-content: center; align-items: center; gap: 5px; color: #9a6a00; }
+  .crown {
+    width: 16px; height: 11px; display: inline-block; background: #ffbe2e; border: 2px solid var(--ink); border-top: 0;
+    clip-path: polygon(0 100%, 0 20%, 25% 55%, 50% 0, 75% 55%, 100% 20%, 100% 100%); box-sizing: content-box;
+  }
+  .crown.light { background: #fff4c2; }
+  .pass-list {
+    list-style: none; margin: 0 -6px; padding: 6px 10px 6px 6px; display: flex; flex-direction: column;
+    max-height: min(46vh, 400px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: #c9b8ff transparent;
+  }
+  .pass-list::-webkit-scrollbar { width: 6px; }
+  .pass-list::-webkit-scrollbar-thumb { background: #c9b8ff; border-radius: 6px; }
+  .pass-row { position: relative; display: grid; grid-template-columns: 1fr 44px 1fr; gap: 6px; padding: 4px 0; align-items: stretch; }
+  /* The road: a line through every tier node, filled up to the tier reached. */
+  .pass-row::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 6px; margin-left: -3px; background: #e6dcf7; }
+  .pass-row.reached::before { background: #7a5cf0; }
+  .pass-row:first-child::before { top: 50%; }
+  .pass-row:last-child::before { bottom: 50%; }
+  .pass-num {
+    position: relative; z-index: 1; align-self: center; justify-self: center; width: 34px; height: 34px; border-radius: 50%;
+    display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 15px;
+    background: #f1ebfb; color: var(--ink-soft); border: 3px solid #d9cdf2;
+  }
+  .pass-row.reached .pass-num { background: #7a5cf0; color: #fff; border-color: var(--ink); }
+  .pass-row.next .pass-num { border-color: #7a5cf0; color: #5a3fc8; animation: ping 1.4s ease-out infinite; }
+  @keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(122, 92, 240, 0.55); } 100% { box-shadow: 0 0 0 12px rgba(122, 92, 240, 0); } }
+  .pass-cell {
+    position: relative; min-width: 0; min-height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+    padding: 8px 4px; border: 3px solid var(--ink); border-radius: 14px; background: #fff; text-align: center;
+  }
+  .pass-cell.prem { background: linear-gradient(160deg, #fff7d9, #ffe08a); border-color: #9a6a00; }
+  .pass-cell.locked { opacity: 0.6; }
+  .pass-cell.locked .pass-reward { filter: saturate(0.35); }
+  .pass-cell.ready { box-shadow: 0 0 0 3px #ffd34d, 0 4px 0 var(--ink); animation: glow 1.6s ease-in-out infinite alternate; }
+  @keyframes glow { from { box-shadow: 0 0 0 2px #ffd34d, 0 3px 0 var(--ink); } to { box-shadow: 0 0 0 5px rgba(255, 211, 77, 0.7), 0 3px 0 var(--ink); } }
+  .pass-cell.claimed { opacity: 0.55; }
+  .pass-cell.skin { background: linear-gradient(160deg, #efe9ff, #d9cdff); }
+  .pass-cell.prem.skin { background: linear-gradient(160deg, #fff1b8, #ffc94d); }
+  .pass-reward { display: flex; flex-direction: column; align-items: center; gap: 3px; font-family: var(--font-display); font-weight: 800; font-size: 16px; line-height: 1; color: var(--ink); }
+  .pass-reward small { font-family: var(--font-body); font-size: 11px; font-weight: 800; color: var(--ink-soft); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .coin-stack { position: relative; width: 28px; height: 22px; }
+  .coin-stack i { position: absolute; left: 3px; width: 22px; height: 9px; border-radius: 50%; background: var(--gold); border: 2px solid var(--gold-deep); }
+  .coin-stack i:nth-child(1) { bottom: 0; }
+  .coin-stack i:nth-child(2) { bottom: 5px; }
+  .coin-stack i:nth-child(3) { bottom: 10px; background: #ffd970; }
+  .coin-stack.big i { width: 24px; }
+  .coin-stack.big::after { content: ""; position: absolute; right: -6px; bottom: 0; width: 14px; height: 14px; border-radius: 50%; background: var(--gold); border: 2px solid var(--gold-deep); }
+  /* A tiny soldier in the look's colors. */
+  .mini-soldier { position: relative; width: 26px; height: 34px; }
+  .mini-soldier::before { content: ""; position: absolute; left: 7px; top: 0; width: 12px; height: 12px; border-radius: 50%; background: var(--h); border: 2px solid var(--ink); box-sizing: border-box; }
+  .mini-soldier::after { content: ""; position: absolute; left: 4px; top: 11px; width: 18px; height: 22px; border-radius: 9px 9px 5px 5px; background: var(--b); border: 2px solid var(--ink); box-sizing: border-box; }
+  .pass-claim {
+    font-family: var(--font-display); font-weight: 800; font-size: 14px; color: #fff; background: var(--blue);
+    border: 2px solid var(--ink); border-radius: 9px; padding: 3px 14px 1px; cursor: pointer; box-shadow: 0 2px 0 var(--ink);
+  }
+  .pass-cell.prem .pass-claim { background: #e09a00; }
+  .pass-check {
+    position: absolute; top: -8px; right: -6px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+    background: #1fae9f; color: #fff; font-size: 13px; font-weight: 900; border: 2px solid var(--ink);
+  }
+  .pass-lock {
+    position: absolute; top: -8px; right: -6px; width: 22px; height: 22px; border-radius: 50%; background: var(--ink);
+    display: grid; place-items: center;
+  }
+  .pass-lock::before { content: ""; width: 8px; height: 6px; background: #ffd34d; border-radius: 1px; margin-top: 4px; }
+  .pass-lock::after { content: ""; position: absolute; top: 4px; width: 6px; height: 6px; border: 2px solid #ffd34d; border-bottom: 0; border-radius: 4px 4px 0 0; }
+  .btn-premium { background: linear-gradient(135deg, #ffbe2e, #ff9628); color: var(--ink); box-shadow: inset 0 -5px 0 #c97a10, 0 4px 0 var(--ink); }
+  .btn-premium:active:not(:disabled) { box-shadow: inset 0 -3px 0 #c97a10, 0 1px 0 var(--ink); }
+  @media (prefers-reduced-motion: reduce) { .pass-cell.ready, .pass-row.next .pass-num { animation: none; } }
+  .daily-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .day {
+    display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px;
+    border: 3px solid var(--ink); border-radius: 14px; background: #fff;
+  }
+  .day.big { grid-column: span 2; background: #fff4d6; }
+  .day small { font-size: 11px; font-weight: 800; color: var(--ink-soft); }
+  .day b { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-display); font-size: 18px; }
+  .day b .coin-icon { width: 14px; height: 14px; }
+  .day.done { opacity: 0.45; }
+  .day.today { background: var(--gold); transform: translateY(-3px); box-shadow: 0 3px 0 var(--ink); }
+  .tut {
+    position: fixed; z-index: 25; pointer-events: none; transform: translate(-50%, -100%);
+    font-family: var(--font-display); font-weight: 800; font-size: 20px; color: var(--ink);
+    background: var(--gold); border: 3px solid var(--ink); border-radius: 14px; padding: 6px 12px 4px;
+    max-width: min(86vw, 320px); text-align: center; text-wrap: balance; box-shadow: 0 3px 0 var(--ink); animation: bob 0.7s ease-in-out infinite alternate;
+  }
+  .tut::after {
+    content: ""; position: absolute; left: 50%; bottom: -14px; margin-left: -10px;
+    border: 10px solid transparent; border-top-color: var(--ink); border-bottom: 0;
+  }
+  @keyframes bob { from { margin-top: 0; } to { margin-top: -8px; } }
+  .stats-wrap { overflow-x: auto; max-height: 46vh; overflow-y: auto; border: 3px solid var(--ink); border-radius: 14px; background: #fff; }
+  .stats-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .stats-table th, .stats-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--line); }
+  .stats-table th:last-child, .stats-table td:last-child { min-width: 160px; }
+  .stats-table th { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); position: sticky; top: 0; background: #fff; }
+  .logo { cursor: default; }
+  .tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; background: var(--line); border: 3px solid var(--ink); border-radius: 14px; padding: 4px; }
+  .tabs button {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 16px;
+    color: var(--ink-soft);
+    background: transparent;
+    border: 0;
+    border-radius: 10px;
+    padding: 8px 4px 6px;
+    cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { background: var(--paper); color: var(--ink); box-shadow: 0 2px 0 var(--ink); }
+  .tabs button:focus-visible { outline: 3px solid var(--lilac); outline-offset: 2px; }
+  .swatch {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 3px solid var(--ink);
+    background: radial-gradient(circle at 50% 32%, var(--h) 0 26%, transparent 27%), linear-gradient(var(--b), var(--b));
+  }
+  .weapon-icon {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    border: 3px solid var(--ink);
+    background: var(--paper);
+    position: relative;
+  }
+  .weapon-icon::before {
+    content: "";
+    position: absolute;
+    left: 6px;
+    top: 50%;
+    height: 8px;
+    width: 24px;
+    margin-top: -4px;
+    border-radius: 3px;
+    background: var(--ink);
+  }
+  .w-shotgun::before { height: 12px; margin-top: -6px; width: 22px; }
+  .w-sniper::before { width: 30px; height: 6px; margin-top: -3px; }
+  .w-minigun::before { height: 14px; margin-top: -7px; width: 26px; background: repeating-linear-gradient(var(--ink) 0 3px, var(--ink-soft) 3px 5px); }
+  #shop-list { max-height: min(52vh, 420px); overflow-y: auto; padding-right: 2px; }
+
+  .mult-tag {
+    margin-top: 4px;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 18px;
+    color: #fff;
+    background: #7a5cf0;
+    border: 3px solid var(--ink);
+    border-radius: 999px;
+    padding: 1px 12px;
+    transform: rotate(-3deg);
+  }
+  /* Brief screen tint when passing a door or landing a big hit. */
+  #flash { position: fixed; inset: 0; pointer-events: none; opacity: 0; }
+  #flash.go { animation: flash 0.35s ease-out; }
+  #flash.good { background: radial-gradient(circle at 50% 70%, rgba(156, 196, 255, 0.55), rgba(156, 196, 255, 0) 70%); }
+  #flash.bad { background: radial-gradient(circle at 50% 70%, rgba(232, 69, 60, 0.5), rgba(232, 69, 60, 0) 70%); }
+  @keyframes flash { from { opacity: 1; } to { opacity: 0; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    #flash.go { animation: none; }
+    .popup, #banner.go, #hud-hint .hand::after { animation: none; }
+    #banner.go { opacity: 1; }
+    .btn { transition: none; }
+  }
+</style>
+
+<canvas id="game" aria-label="Game view"></canvas>
+
+<div id="hud" hidden>
+  <div class="hud-row">
+    <span class="chip"><span class="coin-icon" aria-hidden="true"></span><span id="hud-coins">0</span></span>
+    <div class="hud-mid">
+      <span id="hud-level" class="chip chip-level">Level 1</span>
+      <div class="bar" aria-hidden="true"><div id="hud-progress"></div></div>
+    </div>
+    <button id="btn-pause" class="icon-btn" type="button" aria-label="Pause" data-i18n-label="pause">
+      <svg viewBox="0 0 18 18" aria-hidden="true"><rect x="3" y="2" width="4" height="14" rx="1.5"></rect><rect x="11" y="2" width="4" height="14" rx="1.5"></rect></svg>
+    </button>
+  </div>
+  <div id="hud-hint"><span class="hand" aria-hidden="true"></span><span id="hint-text">Drag to pick a door. Shoot doors to raise them.</span></div>
+</div>
+
+<div id="flash" aria-hidden="true"></div>
+<div id="banner" role="status" hidden></div>
+<div id="popups" aria-hidden="true"></div>
+
+<section id="screen-home" class="screen" aria-label="Home">
+  <div class="home-top">
+    <div class="home-left">
+      <span class="chip"><span class="coin-icon" aria-hidden="true"></span><span data-wallet>0</span></span>
+      <button id="btn-wheel" class="icon-btn wheel-btn" type="button" aria-label="Lucky wheel" data-i18n-label="wheel.title">
+        <span class="mini-wheel" aria-hidden="true"></span><span id="wheel-badge" class="badge-dot" hidden>1</span>
+      </button>
+      <button id="btn-trophies" class="icon-btn wheel-btn" type="button" aria-label="Trophies" data-i18n-label="trophies.title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v2h3v3a4 4 0 0 1-4 4h-.3A5 5 0 0 1 13 14.9V17h3v3H8v-3h3v-2.1A5 5 0 0 1 8.3 12H8a4 4 0 0 1-4-4V5h3V3Zm-1 4v1a2 2 0 0 0 1.6 2A6 6 0 0 1 7 7.2V7H6Zm12 0h-1v.2a6 6 0 0 1-.6 2.8A2 2 0 0 0 18 8V7Z"/></svg>
+        <span id="trophy-badge" class="badge-dot" hidden>0</span>
+      </button>
+    </div>
+    <div class="toggles">
+      <button id="btn-lang" class="text-btn" type="button" data-i18n="lang" data-i18n-label="lang.label">TR</button>
+      <button id="btn-settings" class="icon-btn" type="button" aria-label="Settings" data-i18n-label="set.title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8Zm9 4.9v-3l-2.4-.5a7 7 0 0 0-.7-1.7l1.4-2-2.1-2.1-2 1.4a7 7 0 0 0-1.7-.7L13.5 2h-3l-.5 2.4a7 7 0 0 0-1.7.7l-2-1.4-2.1 2.1 1.4 2a7 7 0 0 0-.7 1.7L2.5 10.5v3l2.4.5c.2.6.4 1.2.7 1.7l-1.4 2 2.1 2.1 2-1.4c.5.3 1.1.5 1.7.7l.5 2.4h3l.5-2.4c.6-.2 1.2-.4 1.7-.7l2 1.4 2.1-2.1-1.4-2c.3-.5.5-1.1.7-1.7l2.4-.5Z"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="logo-wrap">
+    <span class="ad-tag" data-i18n="sponsored">Sponsored?</span>
+    <h1 id="logo" class="logo">Not a<br><span class="strike">Fake</span> Ad</h1>
+    <p class="tagline" data-i18n="tagline">The game from those ads. Actually playable.</p>
+  </div>
+  <div class="home-bottom">
+    <p class="world-line"><span id="home-world">World 1</span><span id="home-kind" class="kind-tag" hidden></span></p>
+    <button id="btn-play" class="btn btn-big" type="button"><span id="play-label">Play level 1</span></button>
+    <div class="btn-row three">
+      <button id="btn-shop" class="btn btn-gold" type="button" data-i18n="shop">Shop</button>
+      <button id="btn-missions" class="btn btn-teal" type="button"><span data-i18n="missions.button">Missions</span><span id="missions-badge" class="badge-dot" hidden>0</span></button>
+      <button id="btn-pass" class="btn btn-pass" type="button"><span data-i18n="pass.button">Pass</span><span id="pass-badge" class="badge-dot" hidden>0</span></button>
+    </div>
+  </div>
+</section>
+
+<section id="screen-shop" class="screen screen-dim" aria-label="Shop" data-i18n-label="shop" hidden>
+  <div class="card">
+    <div class="shop-head">
+      <h2 data-i18n="shop">Shop</h2>
+      <span class="chip"><span class="coin-icon" aria-hidden="true"></span><span data-wallet>0</span></span>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Shop sections" data-i18n-label="shop">
+      <button type="button" role="tab" id="tab-upgrades" data-tab="upgrades" aria-selected="true" data-i18n="tab.upgrades">Upgrades</button>
+      <button type="button" role="tab" id="tab-squad" data-tab="squad" aria-selected="false" data-i18n="tab.squad">Squad</button>
+      <button type="button" role="tab" id="tab-weapons" data-tab="weapons" aria-selected="false" data-i18n="tab.weapons">Weapons</button>
+      <button type="button" role="tab" id="tab-packs" data-tab="packs" aria-selected="false" data-i18n="tab.packs">Packs</button>
+    </div>
+    <ul id="shop-list"></ul>
+    <button id="btn-shop-back" class="btn btn-plain" type="button" data-i18n="back">Back</button>
+  </div>
+</section>
+
+<section id="screen-won" class="screen screen-dim" aria-label="Level cleared" hidden>
+  <div class="card">
+    <h2 id="won-level">Level cleared</h2>
+    <p class="lede" data-i18n="won.lede">Exactly like the ad. Except it was real.</p>
+    <div class="reward"><small data-i18n="coinsEarned">Coins earned</small><span id="won-xp" class="xp-tag"></span><strong><span class="coin-icon" aria-hidden="true"></span><span id="won-coins">+0</span></strong><span id="won-mult" class="mult-tag" hidden>x2 bonus</span></div>
+    <button id="btn-ad-triple" class="btn btn-ad" type="button"><span class="ad-chip" aria-hidden="true">AD</span><span data-i18n="adTriple">Get x3 coins</span></button>
+    <button id="btn-next" class="btn btn-big" type="button" data-i18n="nextLevel">Next level</button>
+    <div class="btn-row">
+      <button id="btn-won-shop" class="btn btn-gold" type="button" data-i18n="shop">Shop</button>
+      <button id="btn-won-home" class="btn btn-plain" type="button" data-i18n="home">Home</button>
+    </div>
+  </div>
+</section>
+
+<section id="screen-lost" class="screen screen-dim" aria-label="Level failed" data-i18n-label="lost.title" hidden>
+  <div class="card">
+    <h2 data-i18n="lost.title">You were the 99%</h2>
+    <p id="lost-line" class="lede">Outnumbered.</p>
+    <div class="reward"><small data-i18n="coinsKept">Coins kept</small><span id="lost-xp" class="xp-tag"></span><strong><span class="coin-icon" aria-hidden="true"></span><span id="lost-coins">+0</span></strong></div>
+    <button id="btn-ad-revive" class="btn btn-ad" type="button"><span class="ad-chip" aria-hidden="true">AD</span><span data-i18n="adRevive">Revive</span></button>
+    <button id="btn-retry" class="btn btn-big" type="button" data-i18n="retry">Try again</button>
+    <div class="btn-row">
+      <button id="btn-lost-shop" class="btn btn-gold" type="button" data-i18n="shop">Shop</button>
+      <button id="btn-lost-home" class="btn btn-plain" type="button" data-i18n="home">Home</button>
+    </div>
+  </div>
+</section>
+
+<section id="screen-ad" class="screen screen-ad" aria-label="Advertisement" data-i18n-label="ad.tag" hidden>
+  <div class="card ad-card">
+    <span class="ad-tag" data-i18n="ad.tag">Ad</span>
+    <h2 data-i18n="ad.title">Your ad here</h2>
+    <p id="ad-line" class="lede">Imagine a real ad here. Ironic, right?</p>
+    <p id="ad-count" class="ad-count">Reward in 4</p>
+    <button id="ad-close" class="btn btn-plain" type="button">Skip (no reward)</button>
+  </div>
+</section>
+
+<section id="screen-pass" class="screen screen-dim" aria-label="Season pass" data-i18n-label="pass.title" hidden>
+  <div class="card pass-card">
+    <div class="pass-hero">
+      <div class="pass-hero-top">
+        <span class="pass-kicker" data-i18n="pass.title">Season pass</span>
+        <span class="chip chip-hero"><span class="coin-icon" aria-hidden="true"></span><span data-wallet>0</span></span>
+      </div>
+      <h2 id="pass-season">Season 1</h2>
+      <span id="pass-days" class="pass-days">30 days left</span>
+      <div class="pass-progress">
+        <div class="pass-medal" aria-hidden="true"><small data-i18n="pass.tierShort">Tier</small><b id="pass-tier-num">0</b></div>
+        <div class="pass-xpwrap">
+          <span id="pass-tier" class="pass-tier">Tier 0/30</span>
+          <div class="pass-bar" aria-hidden="true"><div id="pass-xp"></div></div>
+          <span id="pass-xp-text" class="pass-xp-text">0 / 250 XP</span>
+        </div>
+      </div>
+    </div>
+    <div class="pass-cols" aria-hidden="true">
+      <span class="col-free" data-i18n="pass.free">Free</span><span></span>
+      <span class="col-prem"><span class="crown"></span><span data-i18n="pass.premium">Premium</span></span>
+    </div>
+    <ol id="pass-list" class="pass-list"></ol>
+    <button id="btn-pass-all" class="btn btn-teal" type="button" data-i18n="claimAll" hidden>Claim all</button>
+    <button id="btn-pass-unlock" class="btn btn-premium" type="button"><span class="crown light" aria-hidden="true"></span><span data-i18n="pass.unlock">Unlock Premium</span></button>
+    <button id="btn-pass-close" class="btn btn-plain" type="button" data-i18n="pass.close">Close</button>
+  </div>
+</section>
+
+<section id="screen-daily" class="screen screen-dim" aria-label="Daily reward" data-i18n-label="daily.title" hidden>
+  <div class="card">
+    <h2 data-i18n="daily.title">Daily reward</h2>
+    <p class="lede" data-i18n="daily.lede">Come back every day. Day 7 pays the most.</p>
+    <ol id="daily-list" class="daily-list"></ol>
+    <button id="btn-daily-double" class="btn btn-ad" type="button"><span class="ad-chip" aria-hidden="true">AD</span><span data-i18n="daily.double">Claim x2</span></button>
+    <button id="btn-daily-claim" class="btn btn-big" type="button" data-i18n="daily.claim">Claim</button>
+  </div>
+</section>
+
+<section id="screen-pay" class="screen screen-ad" aria-label="Purchase" data-i18n-label="iap.premium_pass" hidden>
+  <div class="card ad-card">
+    <span class="ad-tag">Test</span>
+    <h2 id="pay-title">Premium pass</h2>
+    <p class="ad-count" id="pay-price">$4.99</p>
+    <p class="lede" data-i18n="pay.line">In the real app, the store payment sheet opens here.</p>
+    <button id="pay-confirm" class="btn btn-big" type="button">Buy (test)</button>
+    <button id="pay-cancel" class="btn btn-plain" type="button" data-i18n="pay.cancel">Cancel</button>
+  </div>
+</section>
+
+<div id="tut" class="tut" hidden><span id="tut-text"></span></div>
+
+<section id="screen-missions" class="screen screen-dim" aria-label="Daily missions" data-i18n-label="missions.title" hidden>
+  <div class="card">
+    <h2 data-i18n="missions.title">Daily missions</h2>
+    <p class="lede" data-i18n="missions.lede">New missions every day.</p>
+    <ol id="missions-list" class="missions-list"></ol>
+    <button id="btn-missions-all" class="btn btn-teal" type="button" data-i18n="claimAll" hidden>Claim all</button>
+    <button id="btn-missions-close" class="btn btn-plain" type="button" data-i18n="pass.close">Close</button>
+  </div>
+</section>
+
+<section id="screen-offer" class="screen screen-dim" aria-label="Starter pack" data-i18n-label="iap.starter_pack" hidden>
+  <div class="card offer-card">
+    <span class="ad-tag" data-i18n="offer.tag">One-time offer</span>
+    <h2 data-i18n="iap.starter_pack">Starter pack</h2>
+    <div class="offer-items">
+      <span><span class="coin-icon" aria-hidden="true"></span>2,000</span>
+      <span><span class="swatch small" aria-hidden="true" style="--b:#2b2140;--h:#3c3450"></span><span data-i18n="skin.night">Night Ops</span></span>
+      <span data-i18n="offer.noads">+ never wait for ads</span>
+    </div>
+    <button id="btn-offer-buy" class="btn btn-big" type="button"><span data-i18n="offer.buy">Get it</span> · $1.99</button>
+    <button id="btn-offer-no" class="btn btn-plain" type="button" data-i18n="offer.no">No thanks</button>
+  </div>
+</section>
+
+<section id="screen-wheel" class="screen screen-dim" aria-label="Lucky wheel" data-i18n-label="wheel.title" hidden>
+  <div class="card wheel-card">
+    <h2 data-i18n="wheel.title">Lucky wheel</h2>
+    <div class="wheel-wrap">
+      <div class="wheel-pointer" aria-hidden="true"></div>
+      <div id="wheel" class="wheel"></div>
+      <div class="wheel-hub" aria-hidden="true"></div>
+    </div>
+    <div id="wheel-result" class="wheel-result" hidden>
+      <small data-i18n="wheel.won">You won</small>
+      <strong id="wheel-prize">+100</strong>
+    </div>
+    <button id="btn-wheel-spin" class="btn btn-big" type="button"><span id="wheel-spin-chip" class="ad-chip" aria-hidden="true" hidden>AD</span><span id="wheel-spin-label">Spin</span></button>
+    <button id="btn-wheel-double" class="btn btn-ad" type="button" hidden><span class="ad-chip" aria-hidden="true">AD</span><span data-i18n="wheel.double">Double it</span></button>
+    <button id="btn-wheel-collect" class="btn" type="button" hidden data-i18n="wheel.collect">Collect</button>
+    <button id="btn-wheel-close" class="btn btn-plain" type="button" data-i18n="pass.close">Close</button>
+  </div>
+</section>
+
+<section id="screen-trophies" class="screen screen-dim" aria-label="Trophies" data-i18n-label="trophies.title" hidden>
+  <div class="card">
+    <h2 data-i18n="trophies.title">Trophies</h2>
+    <div class="tabs two" role="tablist">
+      <button type="button" role="tab" id="ttab-trophies" data-ttab="trophies" aria-selected="true" data-i18n="trophies.tab.ach">Achievements</button>
+      <button type="button" role="tab" id="ttab-records" data-ttab="records" aria-selected="false" data-i18n="trophies.tab.rec">Records</button>
+    </div>
+    <p id="trophy-count" class="lede"></p>
+    <ol id="trophy-list" class="trophy-list"></ol>
+    <button id="btn-trophies-close" class="btn btn-plain" type="button" data-i18n="pass.close">Close</button>
+  </div>
+</section>
+
+<section id="screen-transfer" class="screen screen-dim" aria-label="Move progress" data-i18n-label="transfer.title" hidden>
+  <div class="card">
+    <h2 data-i18n="transfer.title">Move progress</h2>
+    <p class="lede" data-i18n="transfer.lede">Copy this code on your old phone and paste it on the new one.</p>
+    <label class="field-label" for="transfer-code" data-i18n="transfer.yours">Your code</label>
+    <textarea id="transfer-code" class="code-box" rows="3" readonly></textarea>
+    <button id="btn-transfer-copy" class="btn btn-teal" type="button" data-i18n="transfer.copy">Copy code</button>
+    <label class="field-label" for="transfer-input" data-i18n="transfer.paste">Paste a code from another phone</label>
+    <textarea id="transfer-input" class="code-box" rows="3" autocomplete="off" spellcheck="false"></textarea>
+    <p id="transfer-error" class="form-error" data-i18n="transfer.bad" hidden>That code is not valid.</p>
+    <button id="btn-transfer-load" class="btn" type="button" data-i18n="transfer.load">Load this progress</button>
+    <div id="transfer-confirm" class="reset-confirm" hidden>
+      <p data-i18n="transfer.sure">This replaces the progress on this phone. Continue?</p>
+      <div class="btn-row">
+        <button id="btn-transfer-no" class="btn btn-plain" type="button" data-i18n="set.resetNo">Cancel</button>
+        <button id="btn-transfer-yes" class="btn btn-danger" type="button" data-i18n="transfer.load">Load</button>
+      </div>
+    </div>
+    <button id="btn-transfer-back" class="btn btn-plain" type="button" data-i18n="back">Back</button>
+  </div>
+</section>
+
+<section id="screen-account" class="screen screen-dim" aria-label="Save your progress" data-i18n-label="acc.title" hidden>
+  <div class="card account-card">
+    <div data-panel="pick" class="acc-panel">
+      <div class="acc-hero" aria-hidden="true">
+        <svg viewBox="0 0 120 84" width="120" height="84">
+          <path d="M30 70h62a20 20 0 0 0 2-40 28 28 0 0 0-53-6A22 22 0 0 0 30 70z" fill="#fff" stroke="#2b2140" stroke-width="5" stroke-linejoin="round"/>
+          <path d="M60 58V36m-11 10 11-11 11 11" fill="none" stroke="#2f7cf6" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h2 data-i18n="acc.title">Save your progress</h2>
+      <p class="lede" data-i18n="acc.lede">Keep your level, coins and purchases safe, even on a new phone.</p>
+      <p id="account-bonus" class="acc-bonus"><span class="coin-icon" aria-hidden="true"></span><b>+<span id="account-bonus-n">300</span></b> <span data-i18n="acc.bonus">for saving the first time</span></p>
+      <button id="btn-auth-apple" class="btn btn-auth apple" type="button"><svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><rect x="3" y="8" width="14" height="10" rx="3" fill="currentColor"/><path d="M6 8V6a4 4 0 0 1 8 0v2" fill="none" stroke="currentColor" stroke-width="2.4"/></svg><span data-i18n="acc.apple">Continue with Apple</span></button>
+      <button id="btn-auth-google" class="btn btn-auth google" type="button"><svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><circle cx="10" cy="7" r="4" fill="currentColor"/><path d="M2.5 19a7.5 6 0 0 1 15 0z" fill="currentColor"/></svg><span data-i18n="acc.google">Continue with Google</span></button>
+      <button id="btn-auth-email" class="btn btn-auth email" type="button"><svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><rect x="2" y="4" width="16" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="m3 6 7 5 7-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/></svg><span data-i18n="acc.email">Continue with email</span></button>
+      <p class="acc-fine" data-i18n="acc.fine">We only use your account to keep your save. No spam, ever.</p>
+      <p id="account-standin" class="acc-fine" data-i18n="acc.standin">Test build: accounts are kept in this browser only.</p>
+      <button id="btn-account-later" class="btn btn-plain" type="button" data-i18n="acc.later">Not now</button>
+    </div>
+
+    <form id="email-form" data-panel="email" class="acc-panel" novalidate hidden>
+      <h2 id="email-title">Continue with email</h2>
+      <div id="email-step-address" class="acc-panel">
+        <p class="lede" data-i18n="acc.email.lede">We'll email you a 6-digit code. No password needed.</p>
+        <label class="field-label" for="acc-email" data-i18n="acc.emailLabel">Email</label>
+        <input id="acc-email" class="text-input" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" required>
+        <button id="btn-email-send" class="btn" type="submit" data-i18n="acc.code.send">Send code</button>
+        <button id="btn-email-back" class="btn btn-plain" type="button" data-i18n="back">Back</button>
+      </div>
+      <div id="email-step-code" class="acc-panel" hidden>
+        <p id="code-sent-to" class="lede"></p>
+        <label class="field-label" for="acc-code" data-i18n="acc.code.label">Code</label>
+        <input id="acc-code" class="text-input code-input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]*">
+        <p id="code-dev" class="acc-fine" hidden></p>
+        <button id="btn-code-verify" class="btn" type="submit" data-i18n="acc.code.verify">Sign in</button>
+        <div class="acc-links">
+          <button id="btn-code-resend" class="link-btn" type="button">Send again</button>
+          <button id="btn-code-change" class="link-btn" type="button" data-i18n="acc.code.change">Change email</button>
+        </div>
+      </div>
+      <p id="acc-error" class="form-error" role="alert" hidden></p>
+    </form>
+
+    <div data-panel="conflict" class="acc-panel" hidden>
+      <h2 data-i18n="acc.conflict.title">You have a saved game</h2>
+      <p class="lede" data-i18n="acc.conflict.lede">This account already has progress. Which one do you want to keep?</p>
+      <button id="btn-conflict-cloud" class="acc-choice" type="button"><small data-i18n="acc.conflict.cloud">Saved in your account</small><b id="conflict-cloud"></b></button>
+      <button id="btn-conflict-here" class="acc-choice" type="button"><small data-i18n="acc.conflict.here">On this phone</small><b id="conflict-here"></b></button>
+      <p class="acc-fine" data-i18n="acc.conflict.note">The one you don't pick is replaced.</p>
+    </div>
+
+    <div data-panel="me" class="acc-panel" hidden>
+      <h2 data-i18n="acc.me.title">Your account</h2>
+      <div class="acc-me">
+        <span id="me-avatar" class="acc-avatar" aria-hidden="true">?</span>
+        <div><b id="me-name"></b><small id="me-provider"></small></div>
+      </div>
+      <p id="me-synced" class="acc-fine"></p>
+      <button id="btn-acc-sync" class="btn btn-teal" type="button" data-i18n="acc.syncNow">Save now</button>
+      <button id="btn-acc-signout" class="btn btn-plain" type="button" data-i18n="acc.signout">Sign out</button>
+      <button id="btn-acc-delete" class="set-row danger" type="button" data-i18n="acc.delete">Delete account</button>
+      <div id="delete-confirm" class="reset-confirm" hidden>
+        <p data-i18n="acc.deleteSure">Your account and its cloud save will be deleted. Progress on this phone stays.</p>
+        <div class="btn-row">
+          <button id="btn-delete-no" class="btn btn-plain" type="button" data-i18n="set.resetNo">Cancel</button>
+          <button id="btn-delete-yes" class="btn btn-danger" type="button" data-i18n="acc.deleteYes">Delete</button>
+        </div>
+      </div>
+      <button id="btn-me-close" class="btn btn-plain" type="button" data-i18n="back">Back</button>
+    </div>
+  </div>
+</section>
+
+<div id="trophy-toast" class="trophy-toast" role="status" hidden>
+  <span class="trophy-icon" aria-hidden="true"></span>
+  <div><small data-i18n="ach.unlocked">Achievement unlocked</small><b id="trophy-toast-name"></b></div>
+</div>
+
+<section id="screen-settings" class="screen screen-dim" aria-label="Settings" data-i18n-label="set.title" hidden>
+  <div class="card">
+    <h2 data-i18n="set.title">Settings</h2>
+    <h3 class="set-h" data-i18n="set.game">Game</h3>
+    <div class="set-grid">
+      <button id="btn-mute" class="text-btn" type="button" aria-pressed="false">Sound on</button>
+      <button id="btn-music" class="text-btn" type="button" aria-pressed="false">Music on</button>
+      <button id="btn-haptics" class="text-btn" type="button" aria-pressed="false">Vibration on</button>
+      <button id="btn-notify" class="text-btn" type="button" aria-pressed="false">Notifications on</button>
+    </div>
+    <h3 class="set-h" data-i18n="set.graphics">Graphics</h3>
+    <div class="seg" role="group" aria-label="Graphics" data-i18n-label="set.graphics">
+      <button type="button" class="seg-btn" id="q-auto" data-quality="auto" data-i18n="set.q.auto">Auto</button>
+      <button type="button" class="seg-btn" id="q-high" data-quality="high" data-i18n="set.q.high">High</button>
+      <button type="button" class="seg-btn" id="q-low" data-quality="low" data-i18n="set.q.low">Low</button>
+    </div>
+    <h3 class="set-h" data-i18n="acc.section">Account</h3>
+    <div class="set-list">
+      <button id="btn-account" class="set-row" type="button"><span data-i18n="acc.title">Save your progress</span><small id="account-state"></small></button>
+    </div>
+    <h3 class="set-h" data-i18n="set.account">Purchases &amp; privacy</h3>
+    <div class="set-list">
+      <button id="btn-restore" class="set-row" type="button" data-i18n="set.restore">Restore purchases</button>
+      <button id="btn-transfer" class="set-row" type="button" data-i18n="set.transfer">Move progress to another phone</button>
+      <button id="btn-consent" class="set-row" type="button"><span data-i18n="set.consent">Ad preferences</span><small id="consent-state"></small></button>
+      <button id="btn-privacy" class="set-row" type="button" data-i18n="set.privacy">Privacy policy</button>
+      <button id="btn-credits" class="set-row" type="button" data-i18n="set.credits">Credits &amp; licenses</button>
+    </div>
+    <button id="btn-reset" class="set-row danger" type="button" data-i18n="set.reset">Reset progress</button>
+    <div id="reset-confirm" class="reset-confirm" hidden>
+      <p data-i18n="set.resetSure">Delete all progress on this device?</p>
+      <div class="btn-row">
+        <button id="btn-reset-no" class="btn btn-plain" type="button" data-i18n="set.resetNo">Cancel</button>
+        <button id="btn-reset-yes" class="btn btn-danger" type="button" data-i18n="set.resetYes">Yes, reset</button>
+      </div>
+    </div>
+    <p id="settings-version" class="set-version"></p>
+    <button id="btn-settings-close" class="btn btn-plain" type="button" data-i18n="set.close">Close</button>
+  </div>
+</section>
+
+<section id="screen-privacy" class="screen screen-dim" aria-label="Privacy policy" data-i18n-label="set.privacy" hidden>
+  <div class="card prose">
+    <h2 data-i18n="set.privacy">Privacy policy</h2>
+    <p data-i18n="privacy.body1"></p>
+    <p data-i18n="privacy.body2"></p>
+    <p data-i18n="privacy.body3"></p>
+    <p class="muted" data-i18n="privacy.full"></p>
+    <button id="btn-privacy-back" class="btn btn-plain" type="button" data-i18n="back">Back</button>
+  </div>
+</section>
+
+<section id="screen-credits" class="screen screen-dim" aria-label="Credits" data-i18n-label="set.credits" hidden>
+  <div class="card prose">
+    <h2 data-i18n="set.credits">Credits &amp; licenses</h2>
+    <p data-i18n="credits.made">Made by a one-person studio, with help from Claude.</p>
+    <ul class="credits">
+      <li><b>three.js</b> · MIT License · © three.js authors</li>
+      <li><b>Baloo 2</b> · SIL Open Font License 1.1 · © Ek Type</li>
+      <li><b>Nunito</b> · SIL Open Font License 1.1 · © The Nunito Project Authors</li>
+    </ul>
+    <button id="btn-credits-back" class="btn btn-plain" type="button" data-i18n="back">Back</button>
+  </div>
+</section>
+
+<section id="screen-consent" class="screen screen-dim" aria-label="Ad preferences" data-i18n-label="set.consent" hidden>
+  <div class="card prose">
+    <h2 data-i18n="consent.title">Ads, your way</h2>
+    <p data-i18n="consent.body"></p>
+    <button id="btn-consent-yes" class="btn" type="button" data-i18n="consent.yes">Allow personalized ads</button>
+    <button id="btn-consent-later" class="btn btn-plain" type="button" data-i18n="consent.no">General ads only</button>
+  </div>
+</section>
+
+<section id="screen-stats" class="screen screen-dim" aria-label="Playtest stats" data-i18n-label="stats.title" hidden>
+  <div class="card">
+    <h2 data-i18n="stats.title">Playtest stats</h2>
+    <p id="stats-sessions" class="lede"></p>
+    <div class="stats-wrap">
+      <table class="stats-table">
+        <thead><tr><th data-i18n="stats.level">Level</th><th data-i18n="stats.played">Played</th><th data-i18n="stats.won">Won</th><th data-i18n="stats.failed">Failed</th><th data-i18n="stats.reason">Most common loss</th></tr></thead>
+        <tbody id="stats-body"></tbody>
+      </table>
+    </div>
+    <div class="btn-row">
+      <button id="btn-stats-reset" class="btn btn-plain" type="button" data-i18n="stats.reset">Reset</button>
+      <button id="btn-stats-close" class="btn" type="button" data-i18n="stats.close">Close</button>
+    </div>
+  </div>
+</section>
+
+<section id="screen-pause" class="screen screen-dim" aria-label="Paused" data-i18n-label="paused" hidden>
+  <div class="card">
+    <h2 data-i18n="paused">Paused</h2>
+    <button id="btn-resume" class="btn btn-big" type="button" data-i18n="resume">Resume</button>
+    <button id="btn-quit" class="btn btn-plain" type="button" data-i18n="quit">Quit level</button>
+  </div>
+</section>
+
+<!--GAME_SCRIPT-->

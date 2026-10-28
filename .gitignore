@@ -1,0 +1,5 @@
+node_modules/
+dist/
+assets/*.zip
+assets/store/raw/
+.DS_Store
