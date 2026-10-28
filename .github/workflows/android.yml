@@ -40,8 +40,20 @@ jobs:
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ -z "$KS" ]; then echo "::error::ANDROID_KEYSTORE_BASE64 secret is missing"; exit 1; fi
-          echo "$KS" | base64 -d > android/app/upload.jks
+          for v in KS:ANDROID_KEYSTORE_BASE64 KS_PASS:ANDROID_KEYSTORE_PASSWORD KEY_ALIAS:ANDROID_KEY_ALIAS KEY_PASS:ANDROID_KEY_PASSWORD; do
+            n="${v%%:*}"; if [ -z "${!n}" ]; then echo "::error::${v#*:} secret is missing"; exit 1; fi
+          done
+          # Windows copies can carry line breaks or spaces: drop everything that is not base64
+          if ! printf '%s' "$KS" | tr -cd 'A-Za-z0-9+/=' | base64 -d > android/app/upload.jks 2>/dev/null || [ ! -s android/app/upload.jks ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is not valid base64 (paste the whole text again)"; exit 1
+          fi
+          # Check the password and the alias here, so the error says which one is wrong
+          if ! keytool -list -keystore android/app/upload.jks -storepass "$KS_PASS" > /tmp/ks.txt 2>&1; then
+            echo "::error::Keystore could not be opened: ANDROID_KEYSTORE_PASSWORD is wrong, or ANDROID_KEYSTORE_BASE64 is not the .jks file ($(head -c 200 /tmp/ks.txt | tr '\n' ' '))"; exit 1
+          fi
+          if ! keytool -list -keystore android/app/upload.jks -storepass "$KS_PASS" -alias "$KEY_ALIAS" > /dev/null 2>&1; then
+            echo "::error::Alias '$KEY_ALIAS' is not in the keystore. Aliases found: $(grep -oE '^[^,]+, ' /tmp/ks.txt | tr -d ',' | tr '\n' ' ')"; exit 1
+          fi
           {
             echo "storeFile=upload.jks"
             echo "storePassword=$KS_PASS"
