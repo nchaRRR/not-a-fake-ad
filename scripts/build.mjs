@@ -16,20 +16,25 @@ try {
   esbuild = require('/opt/npm-tools/node_modules/esbuild');
 }
 
-const result = await esbuild.build({
-  entryPoints: [resolve(root, 'src/main.js')],
-  bundle: true,
-  minify: true,
-  format: 'iife',
-  target: ['es2020', 'safari15'],
-  write: false,
-  legalComments: 'none',
-  alias: { three: resolve(root, 'vendor/three/three.module.js') },
-});
-
-const js = result.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
+// __CLOUD__: the phone app talks to Supabase; the web preview uses the in-browser stand-in.
+async function bundle(cloud) {
+  const result = await esbuild.build({
+    entryPoints: [resolve(root, 'src/main.js')],
+    bundle: true,
+    minify: true,
+    format: 'iife',
+    target: ['es2020', 'safari15'],
+    write: false,
+    legalComments: 'none',
+    define: { __CLOUD__: String(cloud) },
+    alias: { three: resolve(root, 'vendor/three/three.module.js') },
+  });
+  const js = result.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
+  return page.replace('<!--GAME_SCRIPT-->', () => `<script>${js}</script>`);
+}
 const page = readFileSync(resolve(root, 'src/index.html'), 'utf8');
-const body = page.replace('<!--GAME_SCRIPT-->', () => `<script>${js}</script>`);
+const body = await bundle(false);
+const appPage = await bundle(true);
 
 mkdirSync(resolve(root, 'dist/app/fonts'), { recursive: true });
 writeFileSync(resolve(root, 'dist/not-a-fake-ad.html'), body);
@@ -39,7 +44,7 @@ const fontFace = `<style>
 @font-face { font-family: "Baloo 2"; src: url("fonts/Baloo2.ttf") format("truetype"); font-weight: 400 800; font-display: swap; }
 @font-face { font-family: "Nunito"; src: url("fonts/Nunito.ttf") format("truetype"); font-weight: 200 1000; font-display: swap; }
 </style>`;
-const appBody = body
+const appBody = appPage
   .replace(/<link rel="preconnect"[^>]*>\s*/g, '')
   .replace(/<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com[^>]*>/, fontFace);
 for (const f of ['Baloo2.ttf', 'Nunito.ttf', 'OFL-Baloo2.txt', 'OFL-Nunito.txt']) {

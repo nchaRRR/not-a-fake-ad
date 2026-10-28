@@ -1,0 +1,23 @@
+{
+  "appId": "com.nimoriq.notafakead",
+  "appName": "Not a Fake Ad",
+  "webDir": "dist/app",
+  "backgroundColor": "#ffd9c4",
+  "ios": {
+    "contentInset": "never",
+    "scrollEnabled": false,
+    "backgroundColor": "#ffd9c4"
+  },
+  "android": {
+    "backgroundColor": "#ffd9c4",
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css",
+      "initialViewportFitValueHint": "cover",
+      "hidden": true,
+      "style": "DARK"
+    }
+  }
+}

@@ -3,3 +3,6 @@ dist/
 assets/*.zip
 assets/store/raw/
 .DS_Store
+*.jks
+*.keystore
+android/keystore.properties

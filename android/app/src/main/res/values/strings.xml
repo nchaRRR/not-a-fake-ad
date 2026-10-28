@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Not a Fake Ad</string>
+    <string name="title_activity_main">Not a Fake Ad</string>
+    <string name="package_name">com.nimoriq.notafakead</string>
+    <string name="custom_url_scheme">com.nimoriq.notafakead</string>
+</resources>

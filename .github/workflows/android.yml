@@ -1,0 +1,70 @@
+# Builds the signed Android App Bundle (.aab) for Google Play.
+# Run: GitHub → Actions → "Android (Play)" → Run workflow. The .aab is attached to the run.
+# Secrets (Settings → Secrets and variables → Actions):
+#   ANDROID_KEYSTORE_BASE64  upload keystore (.jks) as base64
+#   ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+name: Android (Play)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Build the game (single-file HTML → dist/app/index.html)
+        run: npm run build
+
+      - name: Copy the game into the Android project
+        run: npx cap sync android
+
+      - name: Signing key
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KS" ]; then echo "::error::ANDROID_KEYSTORE_BASE64 secret is missing"; exit 1; fi
+          echo "$KS" | base64 -d > android/app/upload.jks
+          {
+            echo "storeFile=upload.jks"
+            echo "storePassword=$KS_PASS"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASS"
+          } > android/keystore.properties
+
+      - name: Build the App Bundle
+        working-directory: android
+        env:
+          # every upload needs a higher version code: run 1 → 100, run 2 → 200 …
+          VERSION_CODE: ${{ github.run_number }}00
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon bundleRelease
+          ls -la app/build/outputs/bundle/release/
+
+      - name: Remove the key from the runner
+        if: always()
+        run: rm -f android/app/upload.jks android/keystore.properties
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: not-a-fake-ad-aab-${{ github.run_number }}
+          path: android/app/build/outputs/bundle/release/*.aab
+          retention-days: 30

@@ -260,6 +260,20 @@ export function createAccount(ctx) {
   });
   for (const id of ['btn-me-close']) $(id).addEventListener('click', close);
 
+  // ------------------------------------------------------------ on launch
+  // The sign-in on this device ended (signed out elsewhere, or the account was deleted):
+  // the progress stays on the phone, the player can sign in again from Settings.
+  if (save.account && !auth.hasSession()) {
+    delete save.account;
+    writeSave(save);
+  }
+  // Web: coming back from the Google / Apple page.
+  auth.resume().then((r) => {
+    if (!r) return;
+    if (r.ok) finishSignIn(r.user, 'oauth');
+    else if (r.code !== 'cancelled') popup(t(`acc.err.${r.code}`), 'bad');
+  });
+
   // ------------------------------------------------------------ public
   return {
     open(source) {

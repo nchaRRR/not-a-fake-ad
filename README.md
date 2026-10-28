@@ -14,6 +14,8 @@ O reklamlardaki kapı-koşu oyununun gerçekten oynanabilir hali. Nimoriq · Goo
 | `assets/store/` | Mağaza ekran görüntüleri, EN + TR (App Store 1320×2868, Play 1080×1920) |
 | `site/` | nimoriq.com sayfaları: `not-a-fake-ad-privacy/`, `not-a-fake-ad-support/` |
 | `supabase/` | Veritabanı kurulumu (Kelime Köyü ile aynı Supabase projesi) |
+| `android/`, `ios/` | Capacitor 8 kabukları (`com.nimoriq.notafakead`) |
+| `.github/workflows/` | Android (Play `.aab`) ve iOS (TestFlight) derlemeleri, bkz. `MOBIL-YAYIN.md` |
 
 ## Derleme
 
@@ -22,18 +24,15 @@ npm install
 npm run build
 ```
 
-Çıktı: `dist/not-a-fake-ad.html` (tek dosya web sürümü) ve `dist/app/index.html` (Capacitor'ın paketleyeceği sürüm, fontlar yerel).
+Çıktı: `dist/not-a-fake-ad.html` (web önizleme; hesaplar tarayıcıda taklit edilir) ve `dist/app/index.html`
+(Capacitor'ın paketlediği sürüm; fontlar yerel, hesaplar gerçek Supabase).
 
 ## Supabase
 
 `supabase/001_not_a_fake_ad.sql` dosyasını Kelime Köyü projesinde SQL Editor'da bir kez çalıştır.
 Sadece `nfa_` önekli tablo ve fonksiyon ekler, Kelime Köyü'nün tablolarına dokunmaz.
 
-## Henüz bağlanmayanlar
+## Henüz test modunda olanlar
 
-Oyunda şu an test yerine geçen sahte sürümler çalışıyor; paketleme sırasında gerçekleri bağlanacak:
-
-- Giriş ve bulut kaydı → Supabase (`src/platform.js`, `src/auth.js`)
-- Satın almalar → RevenueCat (`src/payments.js`)
-- Reklamlar → AdMob (`src/ads.js`)
-- Game Center / Play Games, bildirimler → `src/platform.js`
+Giriş ve bulut kaydı gerçek (Supabase, `src/cloud.js`). Satın almalar (`src/payments.js`), reklamlar (`src/ads.js`),
+Game Center / Play Games ve bildirimler (`src/platform.js`) yayından önce bağlanacak. Ayrıntı: `MOBIL-YAYIN.md`.
