@@ -28,6 +28,7 @@ async function bundle(cloud) {
     legalComments: 'none',
     define: { __CLOUD__: String(cloud) },
     alias: { three: resolve(root, 'vendor/three/three.module.js') },
+    loader: { '.webp': 'dataurl' },
   });
   const js = result.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
   return page.replace('<!--GAME_SCRIPT-->', () => `<script>${js}</script>`);

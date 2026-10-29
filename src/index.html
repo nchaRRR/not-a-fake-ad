@@ -791,6 +791,18 @@
     #banner.go { opacity: 1; }
     .btn { transition: none; }
   }
+
+  /* cross-promotion card */
+  .promo { display: flex; align-items: center; gap: 12px; width: 100%; border: 3px solid var(--ink); border-radius: 18px; background: var(--paper); box-shadow: 0 4px 0 var(--ink);
+           padding: 8px 12px 8px 8px; cursor: pointer; text-align: left; color: var(--ink); font-family: var(--font-body); }
+  .promo:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  .promo img { width: 52px; height: 52px; border-radius: 13px; border: 2px solid var(--ink); flex: none; }
+  .promo-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .promo-text b { font-family: var(--font-display); font-size: 19px; line-height: 1.1; }
+  .promo-text small { font-size: 13px; font-weight: 800; color: var(--ink-soft); }
+  .promo-go { font-family: var(--font-display); font-weight: 800; font-size: 15px; color: #fff; background: var(--blue); border: 2px solid var(--ink); border-radius: 10px; padding: 4px 10px 2px; flex: none; }
+  .promo-go.soon { background: var(--gold); color: var(--ink); }
+  .promo:focus-visible { outline: 3px solid var(--lilac); outline-offset: 3px; }
 </style>
 
 <canvas id="game" aria-label="Game view"></canvas>
@@ -845,6 +857,11 @@
       <button id="btn-missions" class="btn btn-teal" type="button"><span data-i18n="missions.button">Missions</span><span id="missions-badge" class="badge-dot" hidden>0</span></button>
       <button id="btn-pass" class="btn btn-pass" type="button"><span data-i18n="pass.button">Pass</span><span id="pass-badge" class="badge-dot" hidden>0</span></button>
     </div>
+    <button class="promo" id="btn-promo" type="button">
+      <img id="promo-img" alt="">
+      <span class="promo-text"><b>Not a Fake Ad: Tower</b><small data-i18n="promo.sub">New in the series: the tower puzzle from the ads</small></span>
+      <span class="promo-go soon" data-i18n="promo.soon">Soon</span>
+    </button>
   </div>
 </section>
 

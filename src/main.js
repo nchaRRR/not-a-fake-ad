@@ -22,6 +22,8 @@ import { createAchievements } from './achievements.js';
 import { scheduleIfAllowed } from './notify.js';
 import { t, getLang, setLang, applyStatic } from './i18n.js';
 import { track, getStats, resetStats } from './analytics.js';
+import { storeLink, openLink } from './promo.js';
+import promoIcon from '../assets/promo-tower-128.webp';
 
 const ads = createAds({ skipAds: () => Array.isArray(save.iap) && (save.iap.includes('no_ads') || save.iap.includes('starter_pack')) });
 const payments = createPayments();
@@ -2410,6 +2412,9 @@ record('skins', save.owned.skins.length);
 record('bestLevel', save.level);
 record('passTier', meta.currentTier());
 
+// the other game of the series
+$('promo-img').src = promoIcon;
+$('btn-promo').addEventListener('click', () => { unlockAudio(); sfx.tap(); track('promo_click', { game: 'tower' }); openLink(storeLink('tower')); });
 track('session_start', { lang: getLang() });
 applyStatic();
 applyLoadout();
