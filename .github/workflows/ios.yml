@@ -67,10 +67,19 @@ jobs:
       - name: API key
         env:
           KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          ISSUER: ${{ secrets.APPSTORE_ISSUER_ID }}
           P8: ${{ secrets.APPSTORE_KEY_P8 }}
         run: |
           mkdir -p "$RUNNER_TEMP/keys"
-          printf '%s\n' "$P8" > "$RUNNER_TEMP/keys/AuthKey_$KEY_ID.p8"
+          printf '%s\n' "$P8" | tr -d '\r' > "$RUNNER_TEMP/keys/AuthKey_$KEY_ID.p8"
+          # Shape checks only (values stay hidden), so a wrong secret is named instead of a bare 401
+          ok=1
+          [[ "$KEY_ID" =~ ^[A-Z0-9]{10}$ ]] || { echo "::error::APPSTORE_KEY_ID should be 10 capital letters/digits (it has ${#KEY_ID} characters)"; ok=0; }
+          [[ "$ISSUER" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] || { echo "::error::APPSTORE_ISSUER_ID should look like xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (it has ${#ISSUER} characters)"; ok=0; }
+          grep -q "BEGIN PRIVATE KEY" "$RUNNER_TEMP/keys/AuthKey_$KEY_ID.p8" || { echo "::error::APPSTORE_KEY_P8 must be the whole .p8 file, from -----BEGIN PRIVATE KEY----- to -----END PRIVATE KEY-----"; ok=0; }
+          openssl pkey -in "$RUNNER_TEMP/keys/AuthKey_$KEY_ID.p8" -noout 2>/dev/null || { echo "::error::APPSTORE_KEY_P8 is not a readable private key (copy the .p8 file again)"; ok=0; }
+          [ $ok = 1 ] || exit 1
+          echo "::notice::App Store Connect key looks well-formed (Key ID ${KEY_ID:0:3}…, issuer ${ISSUER:0:4}…). A 401 after this means Key ID, Issuer ID and the .p8 file do not belong together."
 
       - name: Signing (temporary distribution certificate + App Store profile)
         env:
