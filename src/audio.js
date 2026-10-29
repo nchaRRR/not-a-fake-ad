@@ -40,6 +40,9 @@ if (typeof document !== 'undefined') {
   } catch (e) { /* not packaged */ }
 }
 
+// A full-screen video ad is playing: keep the game quiet underneath it.
+export function adPause(on) { setBackground(on); }
+
 export function setMuted(m) {
   muted = m;
 }

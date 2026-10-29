@@ -5,6 +5,17 @@
 // whether the player earned the reward. Nothing else in the game changes.
 
 import { t } from './i18n.js';
+import { createAdMob } from './admob.js';
+import { adPause } from './audio.js';
+
+// AdMob rewarded units (AdMob → Apps → Not a Fake Ad).
+const UNITS = { android: 'ca-app-pub-8065721637615283/9714788544', ios: 'ca-app-pub-8065721637615283/6227416788' };
+// true: Google's test ads. Keep it on while we test on our own phones (clicking our own real ads
+// gets the AdMob account flagged); switch to false for the store release build.
+export const ADS_TESTING = true;
+const admob = createAdMob(UNITS, { testing: ADS_TESTING, onPlaying: (on) => adPause(on) });
+if (admob) admob.init();
+export const adPrivacy = admob;
 
 const AD_SECONDS = 4;
 
@@ -18,9 +29,17 @@ export function createAds({ skipAds } = {}) {
 
   const LINES = ['ad.line1', 'ad.line2', 'ad.line3'];
 
-  function showRewarded(placement) {
-    if (busy) return Promise.resolve(false);
-    if (skipAds && skipAds()) return Promise.resolve(true);
+  async function showRewarded(placement) {
+    if (busy) return false;
+    if (skipAds && skipAds()) return true;
+    if (admob) {
+      busy = true;
+      const r = await admob.show();
+      busy = false;
+      if (r.earned) return true;
+      if (!r.unavailable) return false; // closed early: no reward
+      // No ad to show right now (new app, no fill, offline): the stand-in below keeps the reward reachable.
+    }
     busy = true;
     return new Promise((resolve) => {
       let left = AD_SECONDS;

@@ -2,6 +2,7 @@
 // credits and licenses, graphics quality, vibration, progress reset.
 import { t } from './i18n.js';
 import { platform } from './platform.js';
+import { adPrivacy } from './ads.js';
 
 export const VERSION = '0.9.0';
 
@@ -137,7 +138,8 @@ export function createSettings(ctx) {
     track('ad_consent', { choice });
     if ($('btn-consent-later').dataset.back) { render(); showOnly('screen-settings'); } else showOnly(null);
   };
-  $('btn-consent').addEventListener('click', () => askConsent(true));
+  // In the phone app Google's own form (shown at launch where required) is the one that counts.
+  $('btn-consent').addEventListener('click', () => (adPrivacy ? adPrivacy.showPrivacyOptions() : askConsent(true)));
   $('btn-consent-yes').addEventListener('click', () => decide('personalized'));
   $('btn-consent-later').addEventListener('click', () => decide('npa'));
 
@@ -157,7 +159,7 @@ export function createSettings(ctx) {
   return {
     // First launch: ask about ads once.
     askConsentIfNeeded() {
-      if (save.adConsent) return false;
+      if (save.adConsent || adPrivacy) return false;
       askConsent(false);
       return true;
     },

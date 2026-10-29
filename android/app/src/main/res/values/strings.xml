@@ -4,4 +4,6 @@
     <string name="title_activity_main">Not a Fake Ad</string>
     <string name="package_name">com.nimoriq.notafakead</string>
     <string name="custom_url_scheme">com.nimoriq.notafakead</string>
+    <!-- AdMob App ID (AdMob → Apps → Android). -->
+    <string name="admob_app_id">ca-app-pub-8065721637615283~2256382183</string>
 </resources>

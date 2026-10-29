@@ -76,11 +76,12 @@ numarası (Android: `<run>00`), her yüklemede kendiliğinden artar. Sürüm de�
 |---|---|---|
 | Giriş + bulut kaydı | **Gerçek** (Supabase) | — |
 | Satın almalar | Sahte onay penceresi, para çekilmez | RevenueCat + mağazalarda 6 ürün |
-| Reklamlar | Sahte 2 sn'lik reklam | AdMob (iOS + Android uygulaması, ödüllü birim) |
+| Reklamlar | **AdMob bağlı** (ödüllü birim), şimdilik Google'ın test reklamları | Yayın derlemesinden önce `src/ads.js` → `ADS_TESTING = false` |
 | Game Center / Play Games, bildirimler | Kapalı | ilgili eklentiler |
 
 Bu yüzden şimdiki build'ler **yalnızca dahili test / TestFlight** içindir; mağazaya incelemeye gönderilmez.
 
-AdMob bağlanınca unutma: Play Console → Uygulama içeriği → **Reklam kimliği** beyanını "Hayır"dan **"Evet"**e çevir
-(şimdilik "Hayır", çünkü build'de reklam kütüphanesi yok); Info.plist'e `GADApplicationIdentifier` + SKAdNetwork,
-Android `strings.xml`'e `admob_app_id` eklenir.
+AdMob bağlı: Play Console → Uygulama içeriği → **Reklam kimliği** beyanı **"Evet"** (reklam), ve "Reklam içeriyor mu?" → **Evet**.
+Uygulama kimlikleri Android `strings.xml` (`admob_app_id`) ve iOS `Info.plist` (`GADApplicationIdentifier`) içinde,
+ödüllü birimler `src/ads.js` içinde. Avrupa onayı Google'ın formuyla (AdMob → Gizlilik ve mesajlaşma → GDPR mesajı).
+Reklam gelmezse (yeni uygulama, doldurma yok) oyun ödülü yine sahte reklam ekranıyla verir, oyuncu takılmaz.
