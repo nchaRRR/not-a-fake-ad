@@ -80,3 +80,7 @@ numarası (Android: `<run>00`), her yüklemede kendiliğinden artar. Sürüm de�
 | Game Center / Play Games, bildirimler | Kapalı | ilgili eklentiler |
 
 Bu yüzden şimdiki build'ler **yalnızca dahili test / TestFlight** içindir; mağazaya incelemeye gönderilmez.
+
+AdMob bağlanınca unutma: Play Console → Uygulama içeriği → **Reklam kimliği** beyanını "Hayır"dan **"Evet"**e çevir
+(şimdilik "Hayır", çünkü build'de reklam kütüphanesi yok); Info.plist'e `GADApplicationIdentifier` + SKAdNetwork,
+Android `strings.xml`'e `admob_app_id` eklenir.
