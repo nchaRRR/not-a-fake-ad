@@ -44,6 +44,34 @@ def sh(*a):
     subprocess.run(a, check=True)
 
 
+CI_PREFIXES = ('KelimeKoyu CI', 'Kostebek CI', 'NotAFakeAd CI')
+
+
+def free_oldest_ci_certificate():
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    found = []
+    for p in call('GET', '/profiles?limit=200&fields[profiles]=name')['data']:
+        if not p['attributes']['name'].startswith(CI_PREFIXES):
+            continue
+        for c in call('GET', '/profiles/' + p['id'] + '/certificates?fields[certificates]=expirationDate,name')['data']:
+            exp = datetime.fromisoformat(c['attributes']['expirationDate'].replace('Z', '+00:00'))
+            created = exp - timedelta(days=365)
+            found.append((created, c['id'], p['id'], p['attributes']['name']))
+    old = sorted(x for x in found if now - x[0] > timedelta(hours=1))
+    if not old:
+        print('::error::Apple says the team has too many distribution certificates, and none of them belongs to an '
+              'older CI run of our games. developer.apple.com → Certificates: revoke one old "Apple Distribution" certificate.')
+        sys.exit(1)
+    created, cert_id, prof_id, prof_name = old[0]
+    call('DELETE', '/certificates/' + cert_id)
+    try:
+        call('DELETE', '/profiles/' + prof_id)
+    except Exception:
+        pass
+    print(f'::notice::Certificate limit reached: revoked the CI certificate of "{prof_name}" (created {created:%Y-%m-%d}) to make room.')
+
+
 def setup(wd):
     os.makedirs(wd, exist_ok=True)
     bundle = os.environ['BUNDLE_ID']
@@ -60,8 +88,17 @@ def setup(wd):
     key, csr = os.path.join(wd, 'key.pem'), os.path.join(wd, 'csr.pem')
     sh('/usr/bin/openssl', 'genrsa', '-out', key, '2048')
     sh('/usr/bin/openssl', 'req', '-new', '-key', key, '-out', csr, '-subj', '/CN=NotAFakeAd CI/C=TR')
-    cert = call('POST', '/certificates', {'data': {'type': 'certificates', 'attributes': {
-        'certificateType': 'DISTRIBUTION', 'csrContent': open(csr).read()}}})['data']
+    body = {'data': {'type': 'certificates', 'attributes': {'certificateType': 'DISTRIBUTION', 'csrContent': open(csr).read()}}}
+    try:
+        cert = call('POST', '/certificates', body)['data']
+    except urllib.error.HTTPError as e:
+        if e.code != 409:
+            raise
+        # The team is at Apple's limit of distribution certificates. Our games' CI runs
+        # (Kelime Köyü, Köstebek Avcısı, Not a Fake Ad) each keep one alive; free the oldest of
+        # those that is more than an hour old. Revoking does not affect processed or approved builds.
+        free_oldest_ci_certificate()
+        cert = call('POST', '/certificates', body)['data']
     state = {'certificate': cert['id']}
     json.dump(state, open(os.path.join(wd, 'signing.json'), 'w'))
     der = os.path.join(wd, 'cert.cer')
