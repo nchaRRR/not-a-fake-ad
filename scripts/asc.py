@@ -108,8 +108,11 @@ def setup(wd):
     bids = [b for b in call('GET', '/bundleIds?filter[identifier]=' + bundle + '&limit=50')['data']
             if b['attributes']['identifier'] == bundle]
     if not bids:
-        print(f'::error::Bundle ID {bundle} is not registered (developer.apple.com → Identifiers)')
-        sys.exit(1)
+        # First build of a new app: register its App ID (same as developer.apple.com → Identifiers → +)
+        name = os.environ.get('APP_NAME', bundle.split('.')[-1])
+        bids = [call('POST', '/bundleIds', {'data': {'type': 'bundleIds', 'attributes': {
+            'identifier': bundle, 'name': name, 'platform': 'IOS'}}})['data']]
+        print(f'::notice::Registered the App ID {bundle} ("{name}") on developer.apple.com')
     name = f"{PREFIX} {os.environ.get('RUN_ID', int(time.time()))}"
     prof = call('POST', '/profiles', {'data': {'type': 'profiles', 'attributes': {'name': name, 'profileType': 'IOS_APP_STORE'},
                                                'relationships': {'bundleId': {'data': {'type': 'bundleIds', 'id': bids[0]['id']}},
