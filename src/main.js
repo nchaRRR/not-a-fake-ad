@@ -111,13 +111,24 @@ const HEAD_GIANT = new THREE.Color(0x2b1a1a);
 const HEAD_HELMET = new THREE.Color(0x9aa3b5);
 
 const bulletMesh = new THREE.InstancedMesh(
-  new THREE.BoxGeometry(0.1, 0.1, 0.55),
+  new THREE.BoxGeometry(0.16, 0.16, 0.8),
   new THREE.MeshBasicMaterial({ color: COLORS.bullet }),
   256
 );
 bulletMesh.count = 0;
 bulletMesh.frustumCulled = false;
+bulletMesh.renderOrder = 3;
 scene.add(bulletMesh);
+// a soft glow around every bullet so they read at a glance on a phone
+const bulletGlow = new THREE.InstancedMesh(
+  new THREE.BoxGeometry(0.36, 0.36, 1.15),
+  new THREE.MeshBasicMaterial({ color: 0xff9a2e, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending }),
+  256
+);
+bulletGlow.count = 0;
+bulletGlow.frustumCulled = false;
+bulletGlow.renderOrder = 4;
+scene.add(bulletGlow);
 
 const unitBox = new THREE.BoxGeometry(1, 1, 1);
 const decorMats = COLORS.decor.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 }));
@@ -1687,8 +1698,8 @@ function applyGate(pair) {
       seeObstacle('mystery', t('new.mystery'));
       bump('mysteries');
     }
-    // Multiplier doors are capped so armies grow fast but do not explode past what enemies can match.
-    if (s.op === 'x') setCount(game.count + Math.min(game.count * (s.val - 1), 30 + game.level * 12));
+    // Not a fake ad: x2 means exactly twice the army.
+    if (s.op === 'x') setCount(game.count * s.val);
     else if (s.op === '÷') setCount(Math.ceil(game.count / s.val));
     else setCount(game.count + Math.round(gate.value));
     good = game.count >= before;
@@ -2116,7 +2127,8 @@ function update(dt) {
     while (game.emitAcc >= 1 && bullets.length < 250) {
       game.emitAcc -= 1;
       const units = crowd.units;
-      const u = units.length ? units[Math.floor(Math.random() * Math.min(units.length, 40))] : { ox: 0, oz: 0 };
+      // any soldier may fire, so the whole front (edges included) shoots
+      const u = units.length ? units[Math.floor(Math.random() * units.length)] : { ox: 0, oz: 0 };
       for (let k = 0; k < w.pellets; k++) {
         const spread = w.pellets > 1 ? ((k / (w.pellets - 1)) * 2 - 1) * w.spread : rand(-1, 1) * w.spread;
         bullets.push({ x: clampX(crowd.x + u.ox) + 0.12, z: u.oz - 0.3, dmg: perPellet, vx: spread * GUN.bulletSpeed * 0.25, range: w.range });
@@ -2155,13 +2167,16 @@ function update(dt) {
   // ---- draw bullets
   bulletMesh.count = Math.min(bullets.length, 256);
   for (let i = 0; i < bulletMesh.count; i++) {
-    dummy.position.set(bullets[i].x, 0.42, bullets[i].z);
+    dummy.position.set(bullets[i].x, 0.6, bullets[i].z);
     dummy.rotation.set(0, 0, 0);
     dummy.scale.set(1, 1, game.weapon ? game.weapon.len : 1);
     dummy.updateMatrix();
     bulletMesh.setMatrixAt(i, dummy.matrix);
+    bulletGlow.setMatrixAt(i, dummy.matrix);
   }
   bulletMesh.instanceMatrix.needsUpdate = true;
+  bulletGlow.count = bulletMesh.count;
+  bulletGlow.instanceMatrix.needsUpdate = true;
 
   // ---- flying bodies
   for (let i = corpses.active.length - 1; i >= 0; i--) {
@@ -2440,7 +2455,7 @@ for (const id of ['btn-consent-yes', 'btn-consent-later']) {
 requestAnimationFrame(frame);
 
 // Test hook for automated balance runs; harmless in production.
-window.__game = { game, crowd, get boss() { return boss; }, gatePairs: () => gatePairs, squads: () => squads, barrels: () => barrels, slams: () => slams, bonus: () => game.bonus, saws: () => saws, shots: () => shots, lose: (r) => loseLevel(r), save, mem: () => ({ ...renderer.info.memory }),
+window.__game = { game, crowd, setCount: (n) => setCount(n), bullets: () => bullets, get boss() { return boss; }, gatePairs: () => gatePairs, squads: () => squads, barrels: () => barrels, slams: () => slams, bonus: () => game.bonus, saws: () => saws, shots: () => shots, lose: (r) => loseLevel(r), save, mem: () => ({ ...renderer.info.memory }),
   account: () => account,
   lang: (l) => { setLang(l); ui.level.textContent = levelTitle(game.level); refreshWallet(); },
 };

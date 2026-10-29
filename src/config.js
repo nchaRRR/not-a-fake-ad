@@ -16,7 +16,7 @@ export const RUN = {
 export const GUN = {
   baseDamage: 1,
   baseRate: 2.5, // shots per soldier per second
-  maxEmit: 16, // visible bullets per second
+  maxEmit: 40, // visible bullets per second (damage per bullet scales so DPS is unchanged)
   bulletSpeed: 36,
   range: 30,
 };

@@ -11,7 +11,33 @@ export function unlockAudio() {
       ctx = null;
     }
   }
-  if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+  if (ctx && ctx.state === 'suspended' && !document.hidden) { bgSuspended = false; ctx.resume().catch(() => {}); }
+}
+
+// Silence everything while the app is in the background (home button, app switcher, phone call).
+// The browser's visibility event covers the web; Capacitor's App plugin covers the packaged app.
+let bgSuspended = false;
+function setBackground(bg) {
+  if (!ctx) return;
+  if (bg) {
+    if (ctx.state === 'running') {
+      bgSuspended = true;
+      ctx.suspend().catch(() => {});
+    }
+  } else if (bgSuspended) {
+    bgSuspended = false;
+    ctx.resume().catch(() => {});
+  }
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => setBackground(document.hidden));
+  window.addEventListener('pagehide', () => setBackground(true));
+  window.addEventListener('pageshow', () => setBackground(document.hidden));
+  window.addEventListener('blur', () => { if (document.hidden) setBackground(true); });
+  try {
+    const app = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+    if (app && app.addListener) app.addListener('appStateChange', (s) => setBackground(!s.isActive));
+  } catch (e) { /* not packaged */ }
 }
 
 export function setMuted(m) {
