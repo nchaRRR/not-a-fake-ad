@@ -1,5 +1,9 @@
 // Builds a level as a list of events placed by distance from the start.
-// Seeded, so level N is always the same layout.
+// Levels 1-30 are hand-designed (levels.js). After that the designs of 11-30 come round again
+// with stronger enemies, and their soldier numbers scaled up so every puzzle still adds up.
+// Boss Week stays a seeded generator: a short run full of good doors, then a mega boss.
+import { LEVELS, layout, scaleLevel, LANE_STEP } from './levels.js';
+import { laneBlades, laneCentre, LANE } from './rules.js';
 
 function mulberry32(seed) {
   let a = seed >>> 0;
@@ -12,64 +16,16 @@ function mulberry32(seed) {
   };
 }
 
-function goodArmyGate(rng, L) {
-  if (rng() < 0.35) return { op: 'x', val: rng() < 0.8 ? 2 : 3 };
-  return { op: '+', val: 4 + Math.floor(rng() * (5 + L * 2)) };
-}
-
-function badArmyGate(rng, L) {
-  if (rng() < 0.3) return { op: '÷', val: 2 };
-  return { op: '+', val: -(3 + Math.floor(rng() * (4 + L * 2))) };
-}
-
 const GUN_GOOD = [
   { kind: 'rate', val: 0.25, label: '+25%' },
   { kind: 'rate', val: 0.4, label: '+40%' },
   { kind: 'dmg', val: 0.5, label: '+50%' },
   { kind: 'dmg', val: 1, label: 'x2' },
 ];
-const GUN_BAD = [
-  { kind: 'rate', val: -0.3, label: '-30%' },
-  { kind: 'dmg', val: -0.3, label: '-30%' },
-];
 
-// The level where each obstacle first shows up, guaranteed early in that level.
-// 9, 11 and 14 debut runners, splitters and medics.
-const FIRST_SEEN = { 3: 'saw', 4: 'gates', 5: 'turret', 6: 'squad', 8: 'squad', 9: 'squad', 11: 'squad', 12: 'squad', 14: 'squad' };
-
-// Newer enemy kinds, rolled on their own seed so the rest of each level's layout stays as it was.
-// runners: a fast pack that rushes ahead of the squad (from 9)
-// splitters: share of the squad that breaks into two smaller enemies when shot (from 11)
-// medics: enemies that heal the squad around them until they are shot (from 14)
-function newKinds(L, i, debut) {
-  const rng = mulberry32(L * 104729 + i * 7907 + 1);
-  const kinds = {};
-  if (L >= 9 && (debut === 9 || rng() < Math.min(0.45, 0.2 + (L - 9) * 0.02))) kinds.runners = 1;
-  if (L >= 11 && (debut === 11 || rng() < 0.5)) kinds.splitters = debut === 11 ? 0.3 : Math.min(0.25, 0.08 + (L - 11) * 0.012);
-  if (L >= 14 && (debut === 14 || rng() < 0.4)) kinds.medics = L >= 24 ? 2 : debut === 14 ? 2 : 1;
-  return kinds;
-}
-
-function weighted(rng, items) {
-  const total = items.reduce((a, [, w]) => a + w, 0);
-  let r = rng() * total;
-  for (const [name, w] of items) {
-    r -= w;
-    if (r <= 0) return name;
-  }
-  return items[0][0];
-}
-
-// Special levels inside every world of ten: 5 = horde, 7 = gold rush, 10 = world boss.
-export function levelKind(L) {
-  if (L >= 10 && L % 10 === 0) return 'boss';
-  if (L >= 5 && L % 10 === 5) return 'horde';
-  if (L >= 7 && L % 10 === 7) return 'gold';
-  return 'normal';
-}
-
-function bossHpFor(L) {
-  return Math.round((200 * Math.pow(L, 1.35) + 120) * (L === 1 ? 1 : L === 2 ? 0.75 : 1.35));
+function goodArmyGate(rng, L) {
+  if (rng() < 0.35) return { op: 'x', val: rng() < 0.8 ? 2 : 3 };
+  return { op: '+', val: 4 + Math.floor(rng() * (5 + L * 2)) };
 }
 
 function goodPair(rng, L, first) {
@@ -78,23 +34,63 @@ function goodPair(rng, L, first) {
   return rng() < 0.5 ? [a, b] : [b, a];
 }
 
-// World boss: a short, generous run, then a giant.
-function buildBossLevel(L, rng) {
-  const events = [];
-  let d = 22;
-  for (let i = 0; i < 5; i++) {
-    if (i === 2) {
-      const a = GUN_GOOD[Math.floor(rng() * GUN_GOOD.length)];
-      const b = GUN_GOOD[Math.floor(rng() * GUN_GOOD.length)];
-      events.push({ d, type: 'weapon', left: a, right: b });
-    } else {
-      const [l, r] = goodPair(rng, L, i === 0);
-      events.push({ d, type: 'gates', left: l, right: r });
+function bossHpFor(L) {
+  return Math.round((200 * Math.pow(L, 1.35) + 120) * (L === 1 ? 1 : L === 2 ? 0.75 : 1.35));
+}
+
+// ---------------------------------------------------------------- hand-designed levels
+// The design a level number plays: 1-30 as written, then 11-30 again (40, 50... stay world bosses).
+export function levelDef(L) {
+  if (L <= LEVELS.length) return LEVELS[L - 1];
+  const idx = 10 + ((L - LEVELS.length - 1) % 20);
+  const k = 1 + Math.floor((L - LEVELS.length - 1) / 40);
+  const base = scaleLevel(LEVELS[idx], k);
+  const tough = 1 + (L - LEVELS.length) * 0.035;
+  return {
+    ...base,
+    replayOf: idx + 1,
+    track: base.track.map((ev) => (ev.type === 'squad' ? { ...ev, hp: Math.round(ev.hp * tough) } : ev)),
+    boss: { ...base.boss, hp: Math.round(base.boss.hp * tough) },
+  };
+}
+
+export function levelKind(L) {
+  return levelDef(L).kind || 'normal';
+}
+
+// Turns a lane split into the wall plus the things in each lane, as ordinary events.
+function expandFork(ev) {
+  const out = [{ type: 'fork', d: ev.d, len: ev.len, tags: [ev.left.tag, ev.right.tag] }];
+  const n = Math.max(ev.left.items.length, ev.right.items.length);
+  for (let k = 0; k < n; k++) {
+    const d = ev.d + 8 + k * LANE_STEP;
+    const li = ev.left.items[k];
+    const ri = ev.right.items[k];
+    const isDoor = (it) => it && it.op !== undefined;
+    if (isDoor(li) || isDoor(ri)) out.push({ type: 'gates', d, left: isDoor(li) ? li : null, right: isDoor(ri) ? ri : null, lane: true });
+    for (const [side, it] of [['L', li], ['R', ri]]) {
+      if (!it || isDoor(it)) continue;
+      const other = side === 'L' ? LANE.R : LANE.L;
+      if (it.wall) out.push({ type: 'wall', kind: 'saws', d, len: 6, safe: [...laneBlades(side, it.w), other], lane: side });
+      else if (it.slow) out.push({ type: 'mud', d: d - 2, side, secs: it.slow, len: Math.min(ev.len - (d - ev.d) - 2, 30) });
+      else if (it.hostages) out.push({ type: 'cage', d, x: laneCentre(side), n: it.hostages });
+      else if (it.key) out.push({ type: 'key', d, x: laneCentre(side) });
     }
-    d += 21;
   }
-  events.push({ d: d + 8, type: 'boss', hp: Math.round(bossHpFor(L) * 1.8), big: true });
-  return { events, length: d + 8, kind: 'boss' };
+  return out;
+}
+
+export function buildLevel(L) {
+  const def = levelDef(L);
+  const { events, length } = layout(def.track, { ...def.boss, hand: true, big: !!def.boss.big });
+  const flat = [];
+  for (const ev of events) {
+    if (ev.type === 'fork') flat.push(...expandFork(ev));
+    else if (ev.type === 'squad') flat.push({ ...ev, count: ev.n, fixed: true, x: 0 });
+    else flat.push(ev);
+  }
+  flat.sort((a, b) => a.d - b.d);
+  return { events: flat, length, kind: def.kind || 'normal', goals: def.goals, start: def.start, idea: def.idea, hand: true };
 }
 
 // Boss Week: a short run full of good doors, then a mega boss scaled to the player's level.
@@ -113,118 +109,7 @@ export function buildBossWeekLevel(L) {
     }
     d += 21;
   }
-  events.push({ d: d + 8, type: 'boss', hp: Math.round(bossHpFor(L) * 2.4), big: true, week: true });
-  return { events, length: d + 8, kind: 'bossweek' };
-}
-
-// Gold rush: no enemies, barrels full of coins, straight into the multiplier tiles.
-function buildGoldLevel(L, rng) {
-  const events = [];
-  let d = 22;
-  for (let i = 0; i < 8; i++) {
-    if (i % 2 === 0) {
-      const [l, r] = goodPair(rng, L, i === 0);
-      events.push({ d, type: 'gates', left: l, right: r });
-    } else {
-      const hp = Math.round((12 + L * 7) * 0.7);
-      events.push({ d, type: 'barrels', xs: [-2.3, 0, 2.3], hp, reward: (4 + L * 2) * 3 });
-    }
-    d += 21;
-  }
-  events.push({ d: d + 4, type: 'finish' });
-  return { events, length: d + 4, kind: 'gold' };
-}
-
-export function buildLevel(L) {
-  const rng = mulberry32(L * 7919 + 13);
-  const kind = levelKind(L);
-  if (kind === 'boss') return buildBossLevel(L, rng);
-  if (kind === 'gold') return buildGoldLevel(L, rng);
-  const events = [];
-  const sections = 6 + Math.min(6, Math.floor(L / 2));
-  let d = 22;
-
-  for (let i = 0; i < sections; i++) {
-    let type;
-    if (i === 0 || i === 1) type = 'gates';
-    else if (i === sections - 1) type = 'squad';
-    else if (i === 2 && FIRST_SEEN[L]) type = FIRST_SEEN[L]; // debut a new obstacle early
-    else if (kind === 'horde') type = weighted(rng, [['squad', 45], ['gates', 30], ['weapon', 25]]);
-    else if (L < 3) {
-      const r = rng();
-      type = r < 0.36 ? 'gates' : r < 0.58 ? 'squad' : r < 0.78 ? 'barrels' : 'weapon';
-    } else {
-      type = weighted(rng, [
-        ['gates', 30], ['squad', 22], ['barrels', 13], ['weapon', 12],
-        ['saw', 12], ...(L >= 5 ? [['turret', 12]] : []),
-      ]);
-    }
-
-    // Some door rows become a single sliding door: worth more, but you have to catch it.
-    if (type === 'gates' && i > 1 && L >= 4 && (rng() < 0.3 || (L === 4 && i === 2))) {
-      const g = goodArmyGate(rng, L);
-      if (g.op === '+') g.val = Math.round(g.val * 1.8);
-      else g.val += 1;
-      events.push({ d, type, moving: true, left: g, right: g, freq: 1 + rng() * 0.5 + L * 0.02 });
-      d += 21;
-      continue;
-    }
-    if (type === 'saw') {
-      events.push({
-        d, type, amp: 1.3 + rng() * 1.2, freq: 1 + rng() * 0.6 + L * 0.03,
-        phase: rng() * 6.28, count: L >= 8 && rng() < 0.4 ? 2 : 1,
-      });
-      d += 21;
-      continue;
-    }
-    if (type === 'turret') {
-      const side = rng() < 0.5 ? -1 : 1;
-      events.push({ d, type, x: side * (1.3 + rng() * 1.3), hp: 24 + L * 10, reward: 8 + L * 2 });
-      d += 23;
-      continue;
-    }
-
-    if (type === 'gates') {
-      // The opening door always adds, so a squad of one can get going.
-      const a = i === 0 ? { op: '+', val: 4 + Math.floor(rng() * (4 + L)) } : goodArmyGate(rng, L);
-      // Early on both doors are usually good; the choice is "which is better".
-      const bothGood = i <= 1 || rng() < (L <= 2 ? 0.6 : 0.42);
-      let b = bothGood ? goodArmyGate(rng, L) : badArmyGate(rng, L);
-      if (L >= 3 && i > 1 && rng() < 0.2) b = { op: '?', val: 0 };
-      const pair = rng() < 0.5 ? [a, b] : [b, a];
-      events.push({ d, type, left: pair[0], right: pair[1] });
-    } else if (type === 'weapon') {
-      const a = GUN_GOOD[Math.floor(rng() * GUN_GOOD.length)];
-      const b = rng() < 0.6
-        ? GUN_GOOD[Math.floor(rng() * GUN_GOOD.length)]
-        : GUN_BAD[Math.floor(rng() * GUN_BAD.length)];
-      const pair = rng() < 0.5 ? [a, b] : [b, a];
-      events.push({ d, type, left: pair[0], right: pair[1] });
-    } else if (type === 'squad') {
-      // Squads grow along the level, in step with the army you are expected to have.
-      const ramp = 0.45 + 0.75 * (i / (sections - 1));
-      const horde = kind === 'horde' ? 1.3 : 1;
-      const count = Math.max(3, Math.round((5 + L * 3.3) * ramp * (0.85 + rng() * 0.4) * horde));
-      const hp = 1 + Math.floor(L / 4);
-      const x = (rng() * 2 - 1) * 1.6;
-      // From level 6 some enemies wear helmets: three times the health.
-      const armored = L >= 6 ? Math.min(0.5, 0.15 + (L - 6) * 0.06) : 0;
-      // Shield bearers from level 8, giants leading the last squads from level 12.
-      const shield = L >= 8 ? Math.min(0.35, 0.12 + (L - 8) * 0.03) : 0;
-      const giants = L >= 12 && (i >= sections - 3 || (L === 12 && i === 2)) ? (L >= 20 ? 2 : 1) : 0;
-      const kinds = newKinds(L, i, i === 2 ? L : 0);
-      events.push({ d, type, count, hp, x, armored, shield, giants, ramp: ramp * horde, ...kinds });
-    } else {
-      const n = rng() < 0.5 ? 2 : 3;
-      const hp = 12 + L * 7 + Math.floor(rng() * 8);
-      const xs = n === 2 ? [-1.75, 1.75] : [-2.3, 0, 2.3];
-      events.push({ d, type, xs, hp, reward: 4 + L * 2 });
-    }
-    d += type === 'squad' ? 25 : 21;
-  }
-
-  // Levels 1-2 stay gentle; after that the boss is built to survive long enough to fight back.
-  const bossHp = Math.round(bossHpFor(L) * (kind === 'horde' ? 0.6 : 1));
-  events.push({ d: d + 8, type: 'boss', hp: bossHp });
-  return { events, length: d + 8, kind };
+  // The mega boss has a weak point too; its health is scaled down by the average armor, so it lasts as long as before.
+  events.push({ d: d + 8, type: 'boss', hp: Math.round(bossHpFor(L) * 2.4 * 0.8), big: true, week: true, weak: true, kind: 'brute' });
+  return { events, length: d + 8, kind: 'bossweek', goals: [{ g: 'win' }, { g: 'boss', s: 45 }, { g: 'boss', s: 30 }] };
 }
