@@ -26,7 +26,7 @@ async function bundle(cloud) {
     target: ['es2020', 'safari15'],
     write: false,
     legalComments: 'none',
-    define: { __CLOUD__: String(cloud) },
+    define: { __CLOUD__: String(cloud), __APP_VERSION__: JSON.stringify(JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).version) },
     alias: { three: resolve(root, 'vendor/three/three.module.js') },
     loader: { '.webp': 'dataurl' },
   });

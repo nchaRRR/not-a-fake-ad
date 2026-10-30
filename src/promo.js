@@ -3,6 +3,7 @@
 export const GAMES = {
   notafakead: { playId: 'com.nimoriq.notafakead', appStoreId: null },
   tower: { playId: 'com.nimoriq.nfatower', appStoreId: null },
+  choices: { playId: 'com.nimoriq.nfachoices', appStoreId: null },
 };
 const WEB = 'https://nimoriq.com/';
 

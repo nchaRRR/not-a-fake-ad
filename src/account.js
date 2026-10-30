@@ -1,7 +1,7 @@
 // "Save your progress": sign up or sign in with Apple, Google or email,
 // keep a copy of the save in the cloud, and bring it back on a new phone.
 // The game asks after the third run and twice more later if the player says "not now".
-import { t, getLang } from './i18n.js';
+import { t, getLang, locale } from './i18n.js';
 import { createAuth, CODE_LENGTH } from './auth.js';
 import { watchSave } from './save.js';
 
@@ -90,7 +90,7 @@ export function createAccount(ctx) {
     $('me-avatar').textContent = (label[0] || '?').toUpperCase();
     $('me-name').textContent = label;
     $('me-provider').textContent = t(`acc.via.${a.provider}`);
-    $('me-synced').textContent = a.synced ? t('acc.synced', { time: new Date(a.synced).toLocaleString(getLang() === 'tr' ? 'tr-TR' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }) }) : t('acc.notSynced');
+    $('me-synced').textContent = a.synced ? t('acc.synced', { time: new Date(a.synced).toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short' }) }) : t('acc.notSynced');
     $('delete-confirm').hidden = true;
     $('btn-acc-delete').hidden = false;
   }

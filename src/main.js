@@ -20,12 +20,17 @@ import { createMissions } from './missions.js';
 import { createWheel } from './wheel.js';
 import { createAchievements } from './achievements.js';
 import { scheduleIfAllowed } from './notify.js';
-import { t, getLang, setLang, applyStatic } from './i18n.js';
+import { t, getLang, setLang, applyStatic, nextLang } from './i18n.js';
 import { track, getStats, resetStats } from './analytics.js';
+import { startTelemetry } from './telemetry.js';
 import { storeLink, openLink } from './promo.js';
 import { runOpening } from './opening.js';
 import { nfaArt } from './onboard-art.js';
 import promoIcon from '../assets/promo-tower-128.webp';
+import promoIcon2 from '../assets/promo-choices-128.webp';
+
+// anonymous play statistics (phone app only)
+startTelemetry({ game: 'nfa', version: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev', enabled: typeof __CLOUD__ !== 'undefined' && __CLOUD__, lang: () => document.documentElement.lang });
 
 const ads = createAds({ skipAds: () => Array.isArray(save.iap) && (save.iap.includes('no_ads') || save.iap.includes('starter_pack')) });
 const payments = createPayments();
@@ -2374,7 +2379,8 @@ window.addEventListener('pointerdown', () => {
 }, { once: true });
 
 $('btn-lang').addEventListener('click', () => {
-  setLang(getLang() === 'tr' ? 'en' : 'tr');
+  setLang(nextLang());
+  $('btn-lang').textContent = getLang().toUpperCase();
   sfx.tap();
   refreshWallet();
 });
@@ -2449,9 +2455,12 @@ record('passTier', meta.currentTier());
 
 // the other game of the series
 $('promo-img').src = promoIcon;
+$('promo-img2').src = promoIcon2;
+$('btn-promo2').addEventListener('click', () => { unlockAudio(); sfx.tap(); track('promo_click', { game: 'choices' }); openLink(storeLink('choices')); });
 $('btn-promo').addEventListener('click', () => { unlockAudio(); sfx.tap(); track('promo_click', { game: 'tower' }); openLink(storeLink('tower')); });
 track('session_start', { lang: getLang() });
 applyStatic();
+$('btn-lang').textContent = getLang().toUpperCase();
 applyLoadout();
 goHome();
 applyQuality(save.quality || 'auto');

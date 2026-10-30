@@ -1,8 +1,14 @@
+import es from './lang/es.js';
+import pt from './lang/pt.js';
+import de from './lang/de.js';
+import fr from './lang/fr.js';
 // Every word the player reads, in English and Turkish.
 // The language follows the phone, and the player can switch it on the home screen.
 
 const STRINGS = {
   en: {
+    "promo.choices": "Pick the item that saves him",
+    "promo.go": "Play",
     'ob.presents': 'presents', 'ob.notfake': 'NOT FAKE', 'ob.skip': 'Skip', 'ob.next': 'Next', 'ob.start': "Let's go!",
     'ob.1.t': 'The game from those ads. For real.', 'ob.1.b': 'Remember the army running through gates? This time you can actually play it.',
     'ob.2.t': 'Pick the better gate', 'ob.2.b': 'Drag left and right. Blue gates grow your army, red ones shrink it.',
@@ -364,6 +370,8 @@ const STRINGS = {
     ],
   },
   tr: {
+    "promo.choices": "Onu kurtaracak eşyayı seç",
+    "promo.go": "Oyna",
     'ob.presents': 'sunar', 'ob.notfake': 'SAHTE DEĞİL', 'ob.skip': 'Geç', 'ob.next': 'İleri', 'ob.start': 'Başla!',
     'ob.1.t': 'O reklamlardaki oyun. Gerçekten.', 'ob.1.b': 'Kapılardan geçen orduyu hatırladın mı? Bu sefer gerçekten oynanıyor.',
     'ob.2.t': 'Daha iyi kapıdan geç', 'ob.2.b': 'Sağa sola sürükle. Mavi kapılar ordunu büyütür, kırmızılar küçültür.',
@@ -715,28 +723,43 @@ const STRINGS = {
   },
 };
 
+STRINGS.es = es;
+STRINGS.pt = pt;
+STRINGS.de = de;
+STRINGS.fr = fr;
+
+// Languages in the order the language button cycles through them.
+export const LANGS = ['en', 'tr', 'es', 'pt', 'de', 'fr'];
+export const LANG_NAMES = { en: 'English', tr: 'Türkçe', es: 'Español', pt: 'Português', de: 'Deutsch', fr: 'Français' };
+const LOCALES = { en: 'en-US', tr: 'tr-TR', es: 'es-ES', pt: 'pt-BR', de: 'de-DE', fr: 'fr-FR' };
+
 function detect() {
   try {
     const saved = localStorage.getItem('not-a-fake-ad-lang');
-    if (saved === 'en' || saved === 'tr') return saved;
+    if (LANGS.includes(saved)) return saved;
   } catch (e) { /* storage unavailable */ }
-  const nav = (navigator.languages && navigator.languages[0]) || navigator.language || 'en';
-  return nav.toLowerCase().startsWith('tr') ? 'tr' : 'en';
+  const list = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en']);
+  for (const l of list) {
+    const code = String(l || '').toLowerCase().slice(0, 2);
+    if (LANGS.includes(code)) return code;
+  }
+  return 'en';
 }
 
 let lang = detect();
-
 export const getLang = () => lang;
+export const locale = () => LOCALES[lang] || 'en-US';
+export const nextLang = () => LANGS[(LANGS.indexOf(lang) + 1) % LANGS.length];
 
 export function setLang(next) {
-  lang = next === 'tr' ? 'tr' : 'en';
+  lang = LANGS.includes(next) ? next : 'en';
   try { localStorage.setItem('not-a-fake-ad-lang', lang); } catch (e) { /* ignore */ }
   document.documentElement.lang = lang;
   applyStatic();
 }
 
 export function t(key, vars) {
-  const v = STRINGS[lang][key] ?? STRINGS.en[key] ?? key;
+  const v = (STRINGS[lang] && STRINGS[lang][key]) ?? STRINGS.en[key] ?? key;
   if (typeof v !== 'string' || !vars) return v;
   return v.replace(/\{(\w+)\}/g, (_, k) => (vars[k] ?? `{${k}}`));
 }
@@ -748,3 +771,4 @@ export function applyStatic() {
 }
 
 document.documentElement.lang = lang;
+export const _STRINGS = STRINGS; // for scripts/check-lang
