@@ -178,7 +178,7 @@ export function buildLevel(L) {
       // Shield bearers from level 8, giants leading the last squads from level 12.
       const shield = L >= 8 ? Math.min(0.35, 0.12 + (L - 8) * 0.03) : 0;
       const giants = L >= 12 && (i >= sections - 3 || (L === 12 && i === 2)) ? (L >= 20 ? 2 : 1) : 0;
-      events.push({ d, type, count, hp, x, armored, shield, giants });
+      events.push({ d, type, count, hp, x, armored, shield, giants, ramp: ramp * horde });
     } else {
       const n = rng() < 0.5 ? 2 : 3;
       const hp = 12 + L * 7 + Math.floor(rng() * 8);

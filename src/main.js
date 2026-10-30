@@ -95,13 +95,15 @@ const allyMesh = new FigureSet(scene, RUN.maxVisible, {
   body: COLORS.ally, head: COLORS.allyHead, helmet: shade(COLORS.ally, 0.65),
   pack: shade(COLORS.ally, 0.55), legs: 0x2b2140, gun: 0x2b2140,
 }, gunGeos.rifle);
-const enemyMesh = new FigureSet(scene, 500, {
+// Enough figures for several big squads at once; the nearest squads were going invisible at 500.
+const ENEMY_DRAW_MAX = 1400;
+const enemyMesh = new FigureSet(scene, ENEMY_DRAW_MAX, {
   body: COLORS.enemy, head: 0xf0c8a8, helmet: shade(COLORS.enemy, 0.6), pack: shade(COLORS.enemy, 0.5), legs: 0x3a1a1a,
 });
 const shieldPlates = new THREE.InstancedMesh(
   new THREE.BoxGeometry(0.46, 0.5, 0.06).translate(0, 0.32, 0.2),
   new THREE.MeshStandardMaterial({ color: 0x8fa3c4, metalness: 0.6, roughness: 0.3 }),
-  300
+  600
 );
 shieldPlates.count = 0;
 shieldPlates.frustumCulled = false;
@@ -111,7 +113,7 @@ const HEAD_GIANT = new THREE.Color(0x2b1a1a);
 const HEAD_HELMET = new THREE.Color(0x9aa3b5);
 
 const bulletMesh = new THREE.InstancedMesh(
-  new THREE.BoxGeometry(0.16, 0.16, 0.8),
+  new THREE.BoxGeometry(0.11, 0.11, 0.6),
   new THREE.MeshBasicMaterial({ color: COLORS.bullet }),
   256
 );
@@ -121,8 +123,8 @@ bulletMesh.renderOrder = 3;
 scene.add(bulletMesh);
 // a soft glow around every bullet so they read at a glance on a phone
 const bulletGlow = new THREE.InstancedMesh(
-  new THREE.BoxGeometry(0.36, 0.36, 1.15),
-  new THREE.MeshBasicMaterial({ color: 0xff9a2e, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending }),
+  new THREE.BoxGeometry(0.22, 0.22, 0.8),
+  new THREE.MeshBasicMaterial({ color: 0xff9a2e, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending }),
   256
 );
 bulletGlow.count = 0;
@@ -471,16 +473,28 @@ function drawGate(gate, type) {
   gate.panel.userData.draw(l.title, l.sub, l.tone);
 }
 
+// Firepower of the army right now (damage per second).
+const armyDps = () => game.count * game.rate * game.dmg;
+
 function spawnSquad(ev, z) {
   const units = [];
-  for (let i = 0; i < ev.count; i++) {
+  // Squads keep up with the army you actually have (x2/x3 doors are exact), so late levels stay a fight:
+  // a share of your army in size, and enough health to take a few seconds of your fire.
+  const L = game.level;
+  const pressure = Math.min(0.55, 0.1 + L * 0.005) * (ev.ramp || 1);
+  const strength = Math.max(ev.count, Math.round(game.count * pressure));
+  const n = Math.min(strength, ENEMY.maxUnits);
+  const w = Math.max(1, Math.round(strength / n)); // each figure stands for w enemies
+  const ttk = 0.6 + L * 0.026; // seconds of full fire this squad should take
+  const unitHp = Math.max(ev.hp * w, Math.ceil((armyDps() * ttk * (ev.ramp || 1)) / n));
+  for (let i = 0; i < n; i++) {
     const r = 0.26 * Math.sqrt(i + 0.5) * 1.1;
     const a = i * 2.39996;
     const roll = Math.random();
     const shield = ev.shield && roll < ev.shield;
     const armored = !shield && ev.armored && roll < (ev.shield || 0) + ev.armored;
     units.push({
-      ox: Math.cos(a) * r, oz: Math.sin(a) * r * 0.8, hp: armored ? ev.hp * 3 : shield ? ev.hp * 2 : ev.hp, armored, shield,
+      ox: Math.cos(a) * r, oz: Math.sin(a) * r * 0.8, hp: armored ? unitHp * 3 : shield ? unitHp * 2 : unitHp, armored, shield, w,
       alive: true, phase: Math.random() * 6.28,
     });
   }
@@ -573,9 +587,11 @@ function spawnBoss(ev, z) {
   g.add(label);
   g.position.set(0, 0, z);
   scene.add(g);
-  label.userData.set(ev.hp, ev.hp);
+  // A boss should take a while even for a huge army.
+  const hp = Math.round(Math.max(ev.hp, armyDps() * (ev.big ? 1.6 : 1) * (4 + Math.min(10, game.level * 0.1))));
+  label.userData.set(hp, hp);
   boss = {
-    x: 0, z, hp: ev.hp, max: ev.hp, group: g, mat, armL, armR, label,
+    x: 0, z, hp, max: hp, group: g, mat, armL, armR, label,
     contact: false, flash: 0, dead: false, slamIn: 0.5, introduced: false, big: !!ev.big,
   };
 }
@@ -1862,6 +1878,7 @@ function update(dt) {
     s.z += dz + (close && playing ? ENEMY.walk * dt : 0);
     if (close && playing) s.x += Math.sign(crowd.x - s.x) * Math.min(Math.abs(crowd.x - s.x), 0.7 * dt);
     let alive = 0;
+    let power = 0;
     let sx = 0;
     for (const u of s.units) {
       if (!u.alive) continue;
@@ -1870,7 +1887,7 @@ function update(dt) {
       const reach = u.giant ? 0.75 : 0.3;
       if (playing && uz > -R * 0.75 - 0.15 - (u.giant ? 0.5 : 0) && uz < R && Math.abs(ux - crowd.x) < R + reach) {
         u.alive = false;
-        setCount(game.count - (u.giant ? 6 + Math.floor(game.level / 5) : u.armored ? 2 : 1));
+        setCount(game.count - (u.giant ? 6 + Math.floor(game.level / 5) : (u.armored ? 2 : 1) * (u.w || 1)));
         if (u.giant) { game.shake = 0.35; burst(ux, 0.8, uz, 14, [sparkMats.enemy, sparkMats.ally], 5); }
         corpse(ux, uz, 'enemy', 0.9);
         mission('kill');
@@ -1887,13 +1904,14 @@ function update(dt) {
         continue;
       }
       alive++;
+      power += u.w || 1;
       sx += ux;
-      if (enemyDrawn < 500) {
+      if (enemyDrawn < ENEMY_DRAW_MAX) {
         const sc = u.giant ? 2.3 : u.armored ? 1.18 : 1;
         enemyMesh.add(ux, uz, Math.PI, sc, game.time * (u.giant ? 7 : 11) + u.phase, enemyStride,
           u.giant ? HEAD_GIANT : u.armored ? HEAD_HELMET : null);
         enemyDrawn++;
-        if (u.shield && shieldsDrawn < 300) {
+        if (u.shield && shieldsDrawn < 600) {
           dummy.position.set(ux, 0, uz);
           dummy.rotation.set(0, 0, 0);
           dummy.scale.setScalar(sc);
@@ -1909,7 +1927,7 @@ function update(dt) {
       continue;
     }
     s.label.position.set(sx / alive, 1.35, s.z - 0.2);
-    s.label.userData.set(alive, '#ffd2cc');
+    s.label.userData.set(power, '#ffd2cc');
   }
   shieldPlates.count = shieldsDrawn;
   shieldPlates.instanceMatrix.needsUpdate = true;

@@ -22,6 +22,7 @@ export const GUN = {
 };
 
 export const ENEMY = {
+  maxUnits: 240, // figures per squad; bigger squads make each figure stand for several enemies
   walk: 1.6, // own walking speed once close
   aggroDist: 26,
 };
