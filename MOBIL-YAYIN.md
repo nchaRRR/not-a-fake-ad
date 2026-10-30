@@ -85,3 +85,10 @@ AdMob bağlı: Play Console → Uygulama içeriği → **Reklam kimliği** beyan
 Uygulama kimlikleri Android `strings.xml` (`admob_app_id`) ve iOS `Info.plist` (`GADApplicationIdentifier`) içinde,
 ödüllü birimler `src/ads.js` içinde. Avrupa onayı Google'ın formuyla (AdMob → Gizlilik ve mesajlaşma → GDPR mesajı).
 Reklam gelmezse (yeni uygulama, doldurma yok) oyun ödülü yine sahte reklam ekranıyla verir, oyuncu takılmaz.
+
+## Paylaş, puanla, sıralama, hediyeler, ara reklam, uzaktan ayar (Ekim 2026)
+
+- **Supabase:** `game_events` (istatistik) ve `003/004_leaderboard_config.sql` (sıralama + `game_config`) dosyaları bir kez çalıştırılır. Üç oyun aynı tabloları kullanır.
+- **Uzaktan ayar:** Supabase → Table editor → `game_config` → oyunun satırındaki `data` (altın çarpanı, süre/zorluk, ara reklam sıklığı, duyuru). Oyun açılışta okur; güncelleme gerekmez.
+- **Ara reklam:** Şu an Google'ın test birimleri. AdMob'da bu uygulamaya **Geçiş reklamı (Interstitial)** birimi açılıp kimliği `src/ads.js` → `INTERSTITIAL` içine yazılır.
+- **Yeni eklentiler:** `@capacitor/share`, `@capacitor/filesystem`, `@capacitor-community/in-app-review` (CI'daki `npm install` + `cap sync` kurar). iOS'ta "Resmi kaydet" için `NSPhotoLibraryAddUsageDescription` eklendi.

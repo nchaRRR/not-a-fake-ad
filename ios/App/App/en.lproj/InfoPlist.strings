@@ -1,2 +1,3 @@
 /* en: app name */
 "CFBundleDisplayName" = "Not a Fake Ad";
+"NSPhotoLibraryAddUsageDescription" = "Lets you save the pictures you share from the game to your photos.";

@@ -225,6 +225,19 @@ export function createCloud(cfg = CLOUD_CONFIG) {
       saveSession(null);
       return r;
     },
+    // Level reached in the other Nimoriq games (the player's own rows; null where there is no save).
+    async otherLevels() {
+      const uid = session?.user?.id;
+      if (!uid) throw new CloudError('auth', 'no session');
+      const out = {};
+      for (const [table, game] of [['tower_saves', 'tower'], ['choices_saves', 'choices']]) {
+        try {
+          const rows = await req('GET', `/rest/v1/${table}?select=level&user_id=eq.${uid}`);
+          out[game] = Array.isArray(rows) && rows[0] ? rows[0].level || 0 : 0;
+        } catch (e) { out[game] = 0; }
+      }
+      return out;
+    },
     async loadSave() {
       const uid = session?.user?.id;
       if (!uid) throw new CloudError('auth', 'no session');

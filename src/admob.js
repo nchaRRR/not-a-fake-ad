@@ -8,7 +8,7 @@ import { nativeCall as call, nativeListen as listen, isNative, nativePlatform } 
 const EVENTS = { reward: 'onRewardedVideoAdReward', dismissed: 'onRewardedVideoAdDismissed', failed: 'onRewardedVideoAdFailedToShow' };
 
 // units: { android: 'ca-app-pub-…/…', ios: 'ca-app-pub-…/…' }; testing: true serves Google's test ads
-export function createAdMob(units, { testing = false, onPlaying = () => {} } = {}) {
+export function createAdMob(units, { testing = false, onPlaying = () => {}, interstitial = null } = {}) {
   if (!isNative()) return null;
   const unit = () => (nativePlatform() === 'ios' ? units.ios : units.android);
   let ready = false;
@@ -16,6 +16,40 @@ export function createAdMob(units, { testing = false, onPlaying = () => {} } = {
   let privacyRequired = false;
   let loaded = false;
   let loading = null;
+  let iLoaded = false;
+  let iLoading = null;
+  const iUnit = () => (interstitial ? (nativePlatform() === 'ios' ? interstitial.ios : interstitial.android) : null);
+
+  function preloadInterstitial() {
+    if (!ready || !canRequest || !iUnit() || iLoaded) return Promise.resolve();
+    if (iLoading) return iLoading;
+    iLoading = call('AdMob', 'prepareInterstitial', { adId: iUnit(), isTesting: testing })
+      .then(() => { iLoaded = true; })
+      .catch((e) => console.warn('[ads] interstitial not loaded', e))
+      .finally(() => { iLoading = null; });
+    return iLoading;
+  }
+
+  // Resolves true if an interstitial was shown (and closed).
+  async function showInterstitial() {
+    if (!ready || !canRequest || !iUnit()) return false;
+    if (!iLoaded) { void preloadInterstitial(); return false; } // not ready: skip this time, never make the player wait
+    iLoaded = false;
+    onPlaying(true);
+    const offs = [];
+    const shown = await new Promise((resolve) => {
+      let done = false;
+      const finish = (r) => { if (!done) { done = true; resolve(r); } };
+      offs.push(listen('AdMob', 'interstitialAdDismissed', () => setTimeout(() => finish(true), 300)));
+      offs.push(listen('AdMob', 'interstitialAdFailedToShow', () => finish(false)));
+      setTimeout(() => finish(false), 90 * 1000);
+      call('AdMob', 'showInterstitial').catch(() => finish(false));
+    });
+    offs.forEach((off) => off());
+    onPlaying(false);
+    void preloadInterstitial();
+    return shown;
+  }
 
   async function init() {
     try {
@@ -28,7 +62,7 @@ export function createAdMob(units, { testing = false, onPlaying = () => {} } = {
       privacyRequired = consent.privacyOptionsRequirementStatus === 'REQUIRED';
       ready = true;
       // let the game settle before the ad SDK starts downloading
-      setTimeout(() => void preload(), 8000);
+      setTimeout(() => { void preload(); void preloadInterstitial(); }, 8000);
     } catch (e) {
       console.warn('[ads] AdMob could not start', e);
     }
@@ -71,6 +105,7 @@ export function createAdMob(units, { testing = false, onPlaying = () => {} } = {
   return {
     init,
     show,
+    showInterstitial,
     get privacyRequired() { return privacyRequired; },
     showPrivacyOptions: () => call('AdMob', 'showPrivacyOptionsForm').catch(() => {}),
   };

@@ -13,7 +13,9 @@ const UNITS = { android: 'ca-app-pub-8065721637615283/9714788544', ios: 'ca-app-
 // true: Google's test ads. Keep it on while we test on our own phones (clicking our own real ads
 // gets the AdMob account flagged); switch to false for the store release build.
 export const ADS_TESTING = true;
-const admob = createAdMob(UNITS, { testing: ADS_TESTING, onPlaying: (on) => adPause(on) });
+// Interstitial (between levels) units: Google's TEST units until Not a Fake Ad has its own in AdMob.
+const INTERSTITIAL = { android: 'ca-app-pub-3940256099942544/1033173712', ios: 'ca-app-pub-3940256099942544/4411468910' };
+const admob = createAdMob(UNITS, { testing: ADS_TESTING, onPlaying: (on) => adPause(on), interstitial: INTERSTITIAL });
 if (admob) admob.init();
 export const adPrivacy = admob;
 

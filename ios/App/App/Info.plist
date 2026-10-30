@@ -96,5 +96,7 @@
 	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Lets you save the pictures you share from the game to your photos.</string>
 </dict>
 </plist>

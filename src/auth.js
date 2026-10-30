@@ -99,6 +99,10 @@ function cloudBackend(providers) {
     async loadCloud() {
       try { return await cloud.loadSave(); } catch (err) { return null; }
     },
+    async otherLevels() {
+      if (!cloud.session) return null;
+      try { return await cloud.otherLevels(); } catch (err) { return null; }
+    },
     async saveCloud(uid, data) {
       try { return await cloud.writeSave(data); } catch (err) { return false; }
     },
@@ -156,6 +160,8 @@ function standInBackend(providers) {
       return { ok: true };
     },
     async loadCloud(uid) { return readDb().saves[uid] || null; },
+    // the web preview has no other games to look at
+    async otherLevels() { return null; },
     async saveCloud(uid, data) {
       const db = readDb();
       db.saves[uid] = data;

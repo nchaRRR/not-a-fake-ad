@@ -11,12 +11,15 @@
     "ios": "npm run cap:sync && cap open ios"
   },
   "dependencies": {
+    "@capacitor-community/admob": "^8.2.1",
+    "@capacitor-community/in-app-review": "^8.0.0",
     "@capacitor/android": "^8.5.2",
     "@capacitor/app": "^8.0.0",
     "@capacitor/browser": "^8.0.0",
     "@capacitor/core": "^8.5.2",
+    "@capacitor/filesystem": "^8.0.0",
     "@capacitor/ios": "^8.5.2",
-    "@capacitor-community/admob": "^8.2.1"
+    "@capacitor/share": "^8.0.0"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.2",

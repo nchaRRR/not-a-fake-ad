@@ -280,6 +280,11 @@ export function createAccount(ctx) {
       from = source || null;
       show(save.account ? 'me' : 'pick');
     },
+    // { nfa, tower, choices } levels in the other games, or null when not signed in
+    async otherLevels() {
+      if (!save.account) return null;
+      return auth.otherLevels();
+    },
     label() {
       const a = save.account;
       return a ? (a.email || a.name || t(`acc.via.${a.provider}`)) : t('acc.signedOutState');

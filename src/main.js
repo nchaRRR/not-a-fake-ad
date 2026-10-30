@@ -28,6 +28,17 @@ import { runOpening } from './opening.js';
 import { nfaArt } from './onboard-art.js';
 import promoIcon from '../assets/promo-tower-128.webp';
 import promoIcon2 from '../assets/promo-choices-128.webp';
+import { createRemote } from './remote.js';
+import { createReview } from './review.js';
+import { makeCard, shareCanvas } from './share.js';
+import { createLeaderboard } from './leaderboard.js';
+import { createCrossRewards } from './crossreward.js';
+import { createInterstitials } from './interstitial.js';
+import { adPrivacy as admobApi } from './ads.js';
+const CLOUD = typeof __CLOUD__ !== 'undefined' && __CLOUD__;
+const remote = createRemote('nfa', { enabled: CLOUD, defaults: { coin_mult: 1, enemy_mult: 1 } });
+remote.refresh();
+const enemyMult = () => remote.num('enemy_mult', 1, 0.4, 2.5);
 
 // anonymous play statistics (phone app only)
 startTelemetry({ game: 'nfa', version: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev', enabled: typeof __CLOUD__ !== 'undefined' && __CLOUD__, lang: () => document.documentElement.lang });
@@ -493,7 +504,7 @@ function spawnSquad(ev, z) {
   const n = Math.min(strength, ENEMY.maxUnits);
   const w = Math.max(1, Math.round(strength / n)); // each figure stands for w enemies
   const ttk = 0.6 + L * 0.026; // seconds of full fire this squad should take
-  const unitHp = Math.max(ev.hp * w, Math.ceil((armyDps() * ttk * (ev.ramp || 1)) / n));
+  const unitHp = Math.max(1, Math.round(Math.max(ev.hp * w, Math.ceil((armyDps() * ttk * (ev.ramp || 1)) / n)) * enemyMult()));
   for (let i = 0; i < n; i++) {
     const r = 0.26 * Math.sqrt(i + 0.5) * 1.1;
     const a = i * 2.39996;
@@ -595,7 +606,7 @@ function spawnBoss(ev, z) {
   g.position.set(0, 0, z);
   scene.add(g);
   // A boss should take a while even for a huge army.
-  const hp = Math.round(Math.max(ev.hp, armyDps() * (ev.big ? 1.6 : 1) * (4 + Math.min(10, game.level * 0.1))));
+  const hp = Math.round(Math.max(ev.hp, armyDps() * (ev.big ? 1.6 : 1) * (4 + Math.min(10, game.level * 0.1))) * enemyMult());
   label.userData.set(hp, hp);
   boss = {
     x: 0, z, hp, max: hp, group: g, mat, armL, armR, label,
@@ -1009,9 +1020,12 @@ function winLevel(mult = 1) {
   sfx.win();
   buzz([20, 40, 20]);
   const base = 20 + game.level * 6 + game.coinsRun;
-  const earned = Math.round(base * incomeMult(save.up.income) * mult);
+  const earned = Math.round(base * incomeMult(save.up.income) * mult * remote.num('coin_mult', 1, 0.2, 5));
   save.coins += earned;
   save.level += 1;
+  leaderboard.submit('level', save.level - 1);
+  lastShare = { title: t('sh.win', { n: game.level }), line: t('sh.dare') };
+  lastWinBig = mult >= 3;
   game.lastEarned = earned;
   if (save.level === 4) setTimeout(maybeOffer, 1800);
   afterRun();
@@ -1066,7 +1080,11 @@ function loseLevel(reason) {
 // After the third run (and twice more later), offer to save progress to an account.
 function afterRun() {
   account.onRunEnd();
-  setTimeout(() => { if (game.mode === 'won' || game.mode === 'lost') account.maybeAsk(); }, 2600);
+  const won = game.mode === 'won';
+  setTimeout(() => {
+    if (game.mode !== 'won' && game.mode !== 'lost') return;
+    if (!account.maybeAsk() && won && game.mode === 'won') review.onWin(lastWinBig ? 'big' : 'win');
+  }, 2600);
 }
 
 // ---------------------------------------------------------------- rewarded ads
@@ -1463,7 +1481,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 $('btn-play').addEventListener('click', startLevel);
-$('btn-next').addEventListener('click', startLevel);
+$('btn-next').addEventListener('click', async () => { await inter.afterLevel(save.level - 1); startLevel(); });
 $('btn-retry').addEventListener('click', startLevel);
 $('btn-resume').addEventListener('click', resumeGame);
 $('btn-pause').addEventListener('click', pauseGame);
@@ -2426,6 +2444,53 @@ $('btn-account').addEventListener('click', () => {
   account.open('settings');
 });
 
+// ---------------------------------------------------------------- leaderboard, review, gifts, share, ads between levels
+const leaderboard = createLeaderboard({ game: 'nfa', enabled: CLOUD, t, sfx, track, boards: [{ id: 'level', label: () => t('lb.board.level') }] });
+const review = createReview({ game: 'nfa', save, writeSave: () => writeSave(save), t, track, remote, gameName: 'Not a Fake Ad', canShow: () => game.mode === 'won' && $('screen-account').hidden });
+const inter = createInterstitials({ admob: admobApi, remote, skip: () => Array.isArray(save.iap) && (save.iap.includes('no_ads') || save.iap.includes('starter_pack')), track });
+const giftCoins = (n) => () => { save.coins += n; refreshWallet(); };
+const cross = createCrossRewards({
+  save, writeSave: () => writeSave(save), t, sfx, track,
+  levels: () => account.otherLevels(),
+  icons: { tower: promoIcon, choices: promoIcon2 },
+  names: { tower: 'Not a Fake Ad: Tower', choices: 'Not a Fake Ad: Choices' },
+  onSignIn: () => account.open('settings'),
+  rewards: [
+    { id: 'tower10', from: 'tower', level: 10, gift: () => t('cr.coins', { n: fmt(2000) }), grant: giftCoins(2000) },
+    { id: 'choices10', from: 'choices', level: 10, gift: () => t('cr.coins', { n: fmt(2000) }), grant: giftCoins(2000) },
+    { id: 'tower30', from: 'tower', level: 30, gift: () => t('cr.coins', { n: fmt(6000) }), grant: giftCoins(6000) },
+    { id: 'choices30', from: 'choices', level: 30, gift: () => t('cr.coins', { n: fmt(6000) }), grant: giftCoins(6000) },
+  ],
+});
+setTimeout(async () => { await cross.refresh(); if (cross.count() && game.mode === 'home') popup(t('cr.new'), 'good'); }, 6000);
+let lastShare = null;
+let lastWinBig = false;
+async function shareMoment() {
+  if (!lastShare) return;
+  unlockAudio(); sfx.tap();
+  renderer.render(scene, camera);
+  const shot = document.createElement('canvas');
+  shot.width = renderer.domElement.width; shot.height = renderer.domElement.height;
+  shot.getContext('2d').drawImage(renderer.domElement, 0, 0);
+  const card = makeCard({ shot, title: lastShare.title, line: lastShare.line, logo: 'Not a Fake Ad', sub: t('sh.cta'), colors: { top: '#7db6ef', bottom: '#ffc3a6' } });
+  const how = await shareCanvas(card, { title: 'Not a Fake Ad', text: `${t('sh.text', { game: 'Not a Fake Ad' })} ${storeLink('notafakead')}`, file: 'not-a-fake-ad.png' });
+  track('share', { kind: 'win', how });
+}
+function showNotice() {
+  const id = remote.get('notice_id', '');
+  const n = remote.get('notice', null);
+  if (!id || !n || save.noticeSeen === id) return;
+  const text = typeof n === 'string' ? n : n[getLang()] || n.en;
+  if (!text) return;
+  save.noticeSeen = id; writeSave(save);
+  setTimeout(() => popup(String(text).slice(0, 160), 'good'), 800);
+}
+remote.onChange(showNotice);
+setTimeout(showNotice, 1500);
+$('btn-share-won').addEventListener('click', () => shareMoment());
+$('btn-lb').addEventListener('click', () => { unlockAudio(); sfx.tap(); leaderboard.open('level'); });
+$('btn-gifts').addEventListener('click', () => { sfx.tap(); $('screen-settings').hidden = true; cross.open(); });
+
 meta = createMeta({
   save, writeSave, sfx, buzz, refreshWallet, ads, payments, track, fmt,
   skinName: (id) => t(`skin.${id}`),
@@ -2497,7 +2562,7 @@ for (const id of ['btn-consent-yes', 'btn-consent-later']) {
 requestAnimationFrame(frame);
 
 // Test hook for automated balance runs; harmless in production.
-window.__game = { game, crowd, setCount: (n) => setCount(n), bullets: () => bullets, get boss() { return boss; }, gatePairs: () => gatePairs, squads: () => squads, barrels: () => barrels, slams: () => slams, bonus: () => game.bonus, saws: () => saws, shots: () => shots, lose: (r) => loseLevel(r), save, mem: () => ({ ...renderer.info.memory }),
+window.__game = { review: () => review.show(), share: () => shareMoment(), cross: () => cross.open(), lb: (b) => leaderboard.open(b), win: (m) => winLevel(m), game, crowd, setCount: (n) => setCount(n), bullets: () => bullets, get boss() { return boss; }, gatePairs: () => gatePairs, squads: () => squads, barrels: () => barrels, slams: () => slams, bonus: () => game.bonus, saws: () => saws, shots: () => shots, lose: (r) => loseLevel(r), save, mem: () => ({ ...renderer.info.memory }),
   account: () => account,
   lang: (l) => { setLang(l); ui.level.textContent = levelTitle(game.level); refreshWallet(); },
 };
