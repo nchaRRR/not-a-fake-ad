@@ -67,6 +67,7 @@ function seen(key) { try { return localStorage.getItem(key + '-onboarded') === '
 function markSeen(key) { try { localStorage.setItem(key + '-onboarded', '1'); } catch (e) { /* storage blocked */ } }
 
 export function runOpening(cfg) {
+  if (typeof window !== 'undefined' && window.__skipOpening) return Promise.resolve({ onboarded: false }); // automated tests
   if (!document.getElementById('op-style')) {
     const st = document.createElement('style');
     st.id = 'op-style';
