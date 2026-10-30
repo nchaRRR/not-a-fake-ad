@@ -20,20 +20,20 @@ const CSS = `
   background: repeating-conic-gradient(rgba(255,190,46,0.16) 0 9deg, transparent 9deg 18deg); animation: opSpin 30s linear infinite; pointer-events: none; }
 @keyframes opSpin { to { transform: translate(-50%, -50%) rotate(360deg); } }
 .op-splash { position: relative; display: grid; place-items: center; width: 100%; height: 100%; }
-.op-studio { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 6px; animation: opStudio 1.15s ease both; }
+.op-studio { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 6px; animation: opStudio 1.6s ease both; }
 .op-mark { width: 74px; height: 74px; border-radius: 22px; background: var(--ink, #2b2140); color: #ffbe2e; display: grid; place-items: center;
   font: 800 46px/1 var(--font-display, sans-serif); box-shadow: 0 6px 0 rgba(43,33,64,0.25); transform: rotate(-6deg); }
 .op-studio b { font: 800 30px/1 var(--font-display, sans-serif); letter-spacing: 0.18em; margin-top: 8px; }
 .op-studio small { font-weight: 800; font-size: 14px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-soft, #5d5172); }
 @keyframes opStudio { 0% { opacity: 0; transform: scale(0.85); } 25% { opacity: 1; transform: scale(1); } 75% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.08); } }
-.op-logo { position: relative; opacity: 0; animation: opLogo 0.6s cubic-bezier(.2,1.5,.4,1) 1.05s both; }
+.op-logo { position: relative; opacity: 0; animation: opLogo 0.6s cubic-bezier(.2,1.5,.4,1) 1.5s both; }
 .op-logo .logo { margin: 0; }
 @keyframes opLogo { from { opacity: 0; transform: scale(0.3) rotate(-14deg); } to { opacity: 1; transform: scale(1) rotate(0); } }
 .op-stamp { position: absolute; left: 50%; top: calc(50% + 92px); transform: translate(-50%, 0) rotate(-10deg);
   font: 800 28px/1 var(--font-display, sans-serif); letter-spacing: 0.06em; color: #2eb872; border: 6px solid #2eb872; border-radius: 14px;
-  padding: 6px 16px 2px; background: rgba(255,255,255,0.85); animation: opStamp 0.35s cubic-bezier(.2,1.6,.4,1) 1.7s both; white-space: nowrap; }
+  padding: 6px 16px 2px; background: rgba(255,255,255,0.85); animation: opStamp 0.35s cubic-bezier(.2,1.6,.4,1) 2.3s both; white-space: nowrap; }
 @keyframes opStamp { from { opacity: 0; transform: translate(-50%, 0) rotate(-10deg) scale(2.6); } to { opacity: 1; transform: translate(-50%, 0) rotate(-10deg) scale(1); } }
-.op-tap { position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 22px); left: 0; right: 0; text-align: center; font-weight: 800; font-size: 13px; color: var(--ink-soft, #5d5172); opacity: 0; animation: opFade 0.4s ease 2s both; }
+.op-tap { position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 22px); left: 0; right: 0; text-align: center; font-weight: 800; font-size: 13px; color: var(--ink-soft, #5d5172); opacity: 0; animation: opFade 0.4s ease 2.8s both; }
 @keyframes opFade { to { opacity: 0.8; } }
 .op-skipped * { animation-delay: 0s !important; animation-duration: 0.01s !important; }
 .op-skipped .op-studio { display: none; }
@@ -108,7 +108,7 @@ export function runOpening(cfg) {
       } else afterSplash();
     };
     root.addEventListener('pointerdown', skipSplash);
-    timer = setTimeout(afterSplash, 2700);
+    timer = setTimeout(afterSplash, 3700);
 
     function showBoard() {
       root.removeEventListener('pointerdown', skipSplash);
