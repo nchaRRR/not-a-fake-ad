@@ -3,6 +3,11 @@
 
 const STRINGS = {
   en: {
+    'ob.presents': 'presents', 'ob.notfake': 'NOT FAKE', 'ob.skip': 'Skip', 'ob.next': 'Next', 'ob.start': "Let's go!",
+    'ob.1.t': 'The game from those ads. For real.', 'ob.1.b': 'Remember the army running through gates? This time you can actually play it.',
+    'ob.2.t': 'Pick the better gate', 'ob.2.b': 'Drag left and right. Blue gates grow your army, red ones shrink it.',
+    'ob.3.t': 'Shoot the red gates', 'ob.3.b': 'Your squad fires on its own. Hit a red gate enough and it turns into a plus.',
+    'ob.4.t': 'Beat the boss, get stronger', 'ob.4.b': 'A boss waits at the end. Spend your coins on weapons and skins.',
     // home & chrome
     'tagline': 'The game from those ads. Actually playable.',
     'sponsored': 'Sponsored?',
@@ -359,6 +364,11 @@ const STRINGS = {
     ],
   },
   tr: {
+    'ob.presents': 'sunar', 'ob.notfake': 'SAHTE DEĞİL', 'ob.skip': 'Geç', 'ob.next': 'İleri', 'ob.start': 'Başla!',
+    'ob.1.t': 'O reklamlardaki oyun. Gerçekten.', 'ob.1.b': 'Kapılardan geçen orduyu hatırladın mı? Bu sefer gerçekten oynanıyor.',
+    'ob.2.t': 'Daha iyi kapıdan geç', 'ob.2.b': 'Sağa sola sürükle. Mavi kapılar ordunu büyütür, kırmızılar küçültür.',
+    'ob.3.t': 'Kırmızı kapıları vur', 'ob.3.b': 'Timin kendi ateş eder. Kırmızı kapıyı yeterince vurursan artıya döner.',
+    'ob.4.t': 'Boss\'u yen, güçlen', 'ob.4.b': 'Bölüm sonunda boss seni bekliyor. Altınlarınla silah ve kostüm al.',
     'tagline': 'O reklamlardaki oyun. Bu sefer gerçekten oynanıyor.',
     'sponsored': 'Sponsorlu?',
     'play': 'Oyna · Bölüm {n}',

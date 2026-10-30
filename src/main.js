@@ -23,6 +23,8 @@ import { scheduleIfAllowed } from './notify.js';
 import { t, getLang, setLang, applyStatic } from './i18n.js';
 import { track, getStats, resetStats } from './analytics.js';
 import { storeLink, openLink } from './promo.js';
+import { runOpening } from './opening.js';
+import { nfaArt } from './onboard-art.js';
 import promoIcon from '../assets/promo-tower-128.webp';
 
 const ads = createAds({ skipAds: () => Array.isArray(save.iap) && (save.iap.includes('no_ads') || save.iap.includes('starter_pack')) });
@@ -2456,9 +2458,22 @@ applyQuality(save.quality || 'auto');
 // First launch asks about ads once; the daily reward waits until that is answered.
 // Launch order: ad consent (first time only), daily reward, then the free spin.
 const openWelcome = () => { if (!meta.openDailyIfReady()) wheel.openIfFree(); };
-setTimeout(() => {
-  if (!settings.askConsentIfNeeded()) openWelcome();
-}, 600);
+// Opening screen first (and the how-it-works pages on the very first launch), then the rest.
+const firstLaunch = save.level <= 1;
+const obArt = nfaArt();
+runOpening({
+  key: 'nfa',
+  logo: '<h1 class="logo">Not a<br><span class="strike">Fake</span> Ad</h1>',
+  pages: [1, 2, 3, 4].map((i) => ({ art: obArt[i - 1], title: t(`ob.${i}.t`), body: t(`ob.${i}.b`) })),
+  str: { presents: t('ob.presents'), notFake: t('ob.notfake'), skip: t('ob.skip'), next: t('ob.next'), start: t('ob.start') },
+  onboard: firstLaunch,
+  onTap: () => unlockAudio(),
+}).then(({ onboarded }) => {
+  track('opening_done', { onboarded });
+  setTimeout(() => {
+    if (!settings.askConsentIfNeeded()) openWelcome();
+  }, 300);
+});
 for (const id of ['btn-daily-claim', 'btn-daily-double']) {
   $(id).addEventListener('click', () => setTimeout(() => {
     if (save.daily) record('bestStreak', save.daily.streak || 0);
