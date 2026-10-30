@@ -34,7 +34,21 @@ const GUN_BAD = [
 ];
 
 // The level where each obstacle first shows up, guaranteed early in that level.
-const FIRST_SEEN = { 3: 'saw', 4: 'gates', 5: 'turret', 6: 'squad', 8: 'squad', 12: 'squad' };
+// 9, 11 and 14 debut runners, splitters and medics.
+const FIRST_SEEN = { 3: 'saw', 4: 'gates', 5: 'turret', 6: 'squad', 8: 'squad', 9: 'squad', 11: 'squad', 12: 'squad', 14: 'squad' };
+
+// Newer enemy kinds, rolled on their own seed so the rest of each level's layout stays as it was.
+// runners: a fast pack that rushes ahead of the squad (from 9)
+// splitters: share of the squad that breaks into two smaller enemies when shot (from 11)
+// medics: enemies that heal the squad around them until they are shot (from 14)
+function newKinds(L, i, debut) {
+  const rng = mulberry32(L * 104729 + i * 7907 + 1);
+  const kinds = {};
+  if (L >= 9 && (debut === 9 || rng() < Math.min(0.45, 0.2 + (L - 9) * 0.02))) kinds.runners = 1;
+  if (L >= 11 && (debut === 11 || rng() < 0.5)) kinds.splitters = debut === 11 ? 0.3 : Math.min(0.25, 0.08 + (L - 11) * 0.012);
+  if (L >= 14 && (debut === 14 || rng() < 0.4)) kinds.medics = L >= 24 ? 2 : debut === 14 ? 2 : 1;
+  return kinds;
+}
 
 function weighted(rng, items) {
   const total = items.reduce((a, [, w]) => a + w, 0);
@@ -81,6 +95,26 @@ function buildBossLevel(L, rng) {
   }
   events.push({ d: d + 8, type: 'boss', hp: Math.round(bossHpFor(L) * 1.8), big: true });
   return { events, length: d + 8, kind: 'boss' };
+}
+
+// Boss Week: a short run full of good doors, then a mega boss scaled to the player's level.
+export function buildBossWeekLevel(L) {
+  const rng = mulberry32(L * 6151 + 77);
+  const events = [];
+  let d = 22;
+  for (let i = 0; i < 6; i++) {
+    if (i === 2 || i === 4) {
+      const a = GUN_GOOD[Math.floor(rng() * GUN_GOOD.length)];
+      const b = GUN_GOOD[Math.floor(rng() * GUN_GOOD.length)];
+      events.push({ d, type: 'weapon', left: a, right: b });
+    } else {
+      const [l, r] = goodPair(rng, L, i === 0);
+      events.push({ d, type: 'gates', left: l, right: r });
+    }
+    d += 21;
+  }
+  events.push({ d: d + 8, type: 'boss', hp: Math.round(bossHpFor(L) * 2.4), big: true, week: true });
+  return { events, length: d + 8, kind: 'bossweek' };
 }
 
 // Gold rush: no enemies, barrels full of coins, straight into the multiplier tiles.
@@ -178,7 +212,8 @@ export function buildLevel(L) {
       // Shield bearers from level 8, giants leading the last squads from level 12.
       const shield = L >= 8 ? Math.min(0.35, 0.12 + (L - 8) * 0.03) : 0;
       const giants = L >= 12 && (i >= sections - 3 || (L === 12 && i === 2)) ? (L >= 20 ? 2 : 1) : 0;
-      events.push({ d, type, count, hp, x, armored, shield, giants, ramp: ramp * horde });
+      const kinds = newKinds(L, i, i === 2 ? L : 0);
+      events.push({ d, type, count, hp, x, armored, shield, giants, ramp: ramp * horde, ...kinds });
     } else {
       const n = rng() < 0.5 ? 2 : 3;
       const hp = 12 + L * 7 + Math.floor(rng() * 8);

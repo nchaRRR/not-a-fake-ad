@@ -811,6 +811,186 @@
   .promo-row .promo-text b { font-size: 14px; line-height: 1.05; }
   .promo-row .promo-text small { font-size: 11px; line-height: 1.15; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .promo-row .promo-go { display: none; }
+
+  /* ---------- New weapons in the shop ---------- */
+  .w-laser::before { width: 28px; height: 7px; margin-top: -3.5px; background: linear-gradient(90deg, var(--ink) 0 55%, #19c8ff 55%); box-shadow: 0 0 6px #7ff6ff; }
+  .w-rocket::before { width: 26px; height: 12px; margin-top: -6px; border-radius: 6px 3px 3px 6px; background: linear-gradient(90deg, #3f8f4a 0 70%, #ff6a2a 70%); }
+  .w-flamer::before { width: 24px; height: 11px; margin-top: -5.5px; background: linear-gradient(90deg, var(--ink) 0 60%, #ffb03a 60% 80%, #ff4a1c 80%); border-radius: 3px 6px 6px 3px; }
+
+  /* ---------- Small status toast (graphics changes) ---------- */
+  .toast {
+    position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 22px); z-index: 40; transform: translateX(-50%);
+    max-width: min(calc(100% - 32px), 340px); padding: 6px 14px 5px; pointer-events: none;
+    background: var(--paper); border: 3px solid var(--ink); border-radius: 999px; box-shadow: 0 3px 0 var(--ink);
+    font-weight: 800; font-size: 13px; text-align: center; line-height: 1.25;
+  }
+  .toast.go { animation: toastUp 3.4s ease forwards; }
+  @keyframes toastUp { 0% { opacity: 0; transform: translate(-50%, 12px); } 8%, 85% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, 6px); } }
+
+  /* ---------- Home: Boss Week card and card album tile ---------- */
+  .event-row { display: flex; gap: 8px; width: 100%; }
+  .bw-card {
+    flex: 3; min-width: 0; position: relative; display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 6px; cursor: pointer; text-align: left;
+    color: #fff; font-family: var(--font-body); border: 3px solid var(--ink); border-radius: 16px; box-shadow: 0 4px 0 var(--ink);
+    background: radial-gradient(circle at 12% 20%, rgba(255, 61, 242, 0.45), transparent 50%), linear-gradient(135deg, #2b2140, #4a3a78 70%, #6b3fa8);
+  }
+  .bw-card:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  .bw-card:focus-visible, .album-tile:focus-visible { outline: 3px solid var(--lilac); outline-offset: 3px; }
+  .bw-art { flex: none; width: 40px; height: 40px; display: grid; place-items: center; background: #ffbe2e; border: 2px solid var(--ink); border-radius: 12px; }
+  .bw-art svg { width: 34px; height: 34px; }
+  .bw-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .bw-text b { font-family: var(--font-display); font-size: 18px; line-height: 1.05; color: #ffd34d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bw-text small { font-size: 11px; font-weight: 800; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bw-reward {
+    flex: none; display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px 1px 5px; color: var(--ink);
+    background: var(--paper); border: 2px solid var(--ink); border-radius: 999px; font-family: var(--font-display); font-weight: 800; font-size: 15px;
+  }
+  .bw-reward .coin-icon { width: 15px; height: 15px; }
+  .bw-reward .mini-soldier { transform: scale(0.55); margin: -8px -6px; }
+  .bw-plus { color: var(--ink-soft); }
+  .bw-check { color: #1fae9f; font-size: 18px; padding: 0 4px; }
+  .bw-card.done { background: linear-gradient(135deg, #3d3656, #5b5276); }
+  .bw-card.done .bw-art { filter: grayscale(0.6); }
+  .album-tile {
+    flex: 1; min-width: 78px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 6px 6px 4px; cursor: pointer;
+    color: var(--ink); background: var(--paper); border: 3px solid var(--ink); border-radius: 16px; box-shadow: 0 4px 0 var(--ink);
+    font-family: var(--font-display); font-weight: 800; font-size: 16px; line-height: 1;
+  }
+  .album-tile:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  .album-icon { position: relative; width: 32px; height: 26px; }
+  .album-icon i { position: absolute; top: 0; width: 18px; height: 25px; border: 2px solid var(--ink); border-radius: 4px; }
+  .album-icon i:first-child { left: 2px; background: #7a5cf0; transform: rotate(-12deg); }
+  .album-icon i:last-child { right: 2px; background: #ffbe2e; transform: rotate(10deg); }
+  .album-icon i:last-child::after { content: "★"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; color: #fff; -webkit-text-stroke: 1px var(--ink); }
+  .event-row .album-tile:only-child, .bw-card[hidden] + .album-tile { flex-direction: row; gap: 8px; padding: 8px; }
+  @media (max-width: 400px) { .album-tile { flex: 0 0 76px; min-width: 0; } .bw-reward { padding-inline: 4px 6px; font-size: 14px; } }
+  /* Short phones (iPhone SE and the like): the event row costs height, so the menu sits a bit higher. */
+  @media (max-height: 740px) {
+    .home-bottom { margin-top: 1vh; gap: 10px; }
+    .bw-card { padding-block: 3px; }
+    .bw-art { width: 34px; height: 34px; }
+    .bw-art svg { width: 28px; height: 28px; }
+    .album-tile { padding-block: 3px; }
+    .album-icon { transform: scale(0.8); margin: -3px 0 -4px; }
+  }
+
+  /* ---------- Win screen: event line and card drop ---------- */
+  .won-event { margin: -4px 0 0; text-align: center; font-weight: 800; font-size: 14px; color: #5a3fc8; background: #efe9ff; border: 2px solid #7a5cf0; border-radius: 12px; padding: 6px 10px; }
+  .won-card { display: flex; align-items: center; gap: 12px; background: #fff; border: 3px solid var(--ink); border-radius: 16px; padding: 8px 12px 8px 8px; animation: cardIn 0.5s cubic-bezier(.2,1.6,.4,1) both; }
+  .won-card.set-done { background: #fff6dc; border-color: #c98a00; }
+  .won-card-slot { flex: none; width: 66px; }
+  .won-card-slot .tcard { transform: rotate(-4deg); }
+  .won-card-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .won-card-text small { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+  .won-card-text b { font-family: var(--font-display); font-size: 20px; line-height: 1.05; }
+  .won-card-text span { font-size: 13px; font-weight: 800; color: var(--ink-soft); }
+  .won-card.melt .won-card-slot .tcard { animation: melt 0.7s ease-in forwards; }
+  @keyframes cardIn { from { opacity: 0; transform: scale(0.6) rotate(-6deg); } to { opacity: 1; transform: none; } }
+  @keyframes melt { 40% { transform: rotate(8deg) scale(1.1); filter: brightness(1.4); } 100% { transform: rotate(20deg) scale(0.2); opacity: 0; } }
+  .fly-coin {
+    position: fixed; z-index: 50; width: 18px; height: 18px; pointer-events: none; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #fff3b0, var(--gold) 45%, var(--gold-deep)); border: 2px solid var(--ink);
+    animation: flyCoin 0.8s cubic-bezier(.5,-0.4,.7,1) both;
+  }
+  @keyframes flyCoin { from { transform: translate(0, 0) scale(0.6); } 30% { transform: translate(calc(var(--dx) * 0.1), -30px) scale(1.2); } to { transform: translate(var(--dx), var(--dy)) scale(0.7); opacity: 0.4; } }
+
+  /* ---------- Trading cards ---------- */
+  .tcard {
+    position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 4px; aspect-ratio: 5 / 7; padding: 5px 5px 4px;
+    background: var(--set);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--set) 70%, #fff), var(--set)); border: 3px solid var(--ink); border-radius: 12px; box-shadow: 0 3px 0 var(--ink);
+  }
+  .tcard-art { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; background: #fff7ef; border: 2px solid var(--ink); border-radius: 8px; overflow: hidden; }
+  .tcard-art svg { width: 92%; height: 92%; }
+  .tcard-name { font-family: var(--font-display); font-weight: 800; font-size: 12px; line-height: 1.05; text-align: center; color: #fff; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; min-height: 2.1em; display: grid; place-items: center; overflow-wrap: anywhere; }
+  .tcard-gem { position: absolute; top: -7px; right: -7px; width: 18px; height: 18px; border: 2px solid var(--ink); border-radius: 50%; background: #d8d2e6; }
+  .tcard.r-r .tcard-gem { background: #2f7cf6; border-radius: 4px; transform: rotate(45deg); width: 16px; height: 16px; top: -6px; right: -6px; }
+  .tcard.r-e .tcard-gem { background: #ff3df2; border-radius: 3px; clip-path: polygon(50% 0, 63% 35%, 100% 38%, 71% 60%, 82% 100%, 50% 78%, 18% 100%, 29% 60%, 0 38%, 37% 35%); border: 0; width: 22px; height: 22px; top: -9px; right: -9px; filter: drop-shadow(0 0 0 var(--ink)) drop-shadow(1.5px 1.5px 0 var(--ink)); }
+  .tcard.r-e { box-shadow: 0 3px 0 var(--ink), 0 0 0 3px rgba(255, 61, 242, 0.35); }
+  .tcard.r-e .tcard-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,0.65) 50%, transparent 65%); background-size: 250% 100%; animation: shine 3s ease-in-out infinite; }
+  @keyframes shine { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+  .tcard.missing { background: #d9cfe0; box-shadow: 0 3px 0 rgba(43,33,64,0.5); border-style: dashed; }
+  .tcard.missing .tcard-art { background: #ece4f0; }
+  .tcard.missing .tcard-art svg { filter: brightness(0); opacity: 0.16; }
+  .tcard.missing .tcard-gem { opacity: 0.55; }
+  .tcard.missing .tcard-name { -webkit-text-stroke: 0; color: var(--ink-soft); }
+  .tcard-q { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--font-display); font-size: 34px; color: #fff; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
+  .tcard-new { position: absolute; top: -8px; left: -6px; padding: 1px 6px 0; font-size: 10px; font-weight: 900; color: #fff; background: var(--red); border: 2px solid var(--ink); border-radius: 6px; transform: rotate(-8deg); }
+  .tcard-n { position: absolute; bottom: 26px; right: 6px; padding: 0 5px; font-size: 11px; font-weight: 900; background: var(--paper); border: 2px solid var(--ink); border-radius: 8px; }
+
+  /* ---------- Album screen ---------- */
+  .album-card { gap: 12px; }
+  .album-card .tabs button { font-size: 13px; padding-inline: 2px; position: relative; }
+  .tabs button.has-new::after { content: ""; position: absolute; top: 2px; right: 3px; width: 9px; height: 9px; border-radius: 50%; background: var(--red); border: 2px solid var(--ink); }
+  .album-prog { display: flex; align-items: center; gap: 10px; }
+  .album-prog .bar { flex: 1; width: auto; }
+  #album-bar { height: 100%; transform-origin: left; transform: scaleX(0); transition: transform 0.4s ease; }
+  #album-prog-text { font-family: var(--font-display); font-weight: 800; font-size: 18px; font-variant-numeric: tabular-nums; }
+  .album-reward { margin: 0; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 5px; font-weight: 800; font-size: 14px; background: #fff; border: 2px solid var(--line); border-radius: 12px; padding: 6px 8px; min-height: 40px; }
+  .album-reward small { font-size: 12px; color: var(--ink-soft); }
+  .album-reward b { font-family: var(--font-display); font-size: 17px; }
+  .album-reward .coin-icon { width: 16px; height: 16px; }
+  .album-reward .mini-soldier { transform: scale(0.6); margin: -7px -5px; }
+  .album-done { color: #1fae9f; font-family: var(--font-display); font-size: 17px; }
+  .album-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 12px; padding: 8px 6px 4px; }
+  .album-hint { margin: 0; text-align: center; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+
+  /* ---------- Christmas ---------- */
+  .garland { position: fixed; left: 0; right: 0; top: calc(env(safe-area-inset-top, 0px) + 54px); height: 40px; pointer-events: none; z-index: 0; }
+  .garland svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .garland i { position: absolute; width: 9px; height: 13px; margin-left: -4.5px; border: 2px solid var(--ink); border-radius: 50% 50% 45% 45%; animation: twinkle 1.6s ease-in-out infinite alternate; }
+  .garland i:nth-child(4n+2) { background: #ff4a3d; --g: rgba(255,74,61,0.8); }
+  .garland i:nth-child(4n+3) { background: #ffd34d; --g: rgba(255,211,77,0.8); animation-delay: -0.4s; }
+  .garland i:nth-child(4n) { background: #4fc3ff; --g: rgba(79,195,255,0.8); animation-delay: -0.8s; }
+  .garland i:nth-child(4n+1) { background: #2bd47a; --g: rgba(43,212,122,0.8); animation-delay: -1.2s; }
+  @keyframes twinkle { from { box-shadow: 0 0 2px 0 var(--g); filter: brightness(0.8); } to { box-shadow: 0 0 9px 3px var(--g); filter: brightness(1.15); } }
+  .home-top { z-index: 1; }
+  body.xmas #btn-play { background-image: radial-gradient(circle at 12% 0, #fff 0 9px, transparent 10px), radial-gradient(circle at 30% 0, #fff 0 7px, transparent 8px), radial-gradient(circle at 70% 0, #fff 0 8px, transparent 9px), radial-gradient(circle at 90% 0, #fff 0 10px, transparent 11px); }
+  body.xmas .logo-wrap .ad-tag { background: #2bd47a; }
+  .xmas-card { overflow: hidden; }
+  .xmas-tag { background: #d62839; color: #fff; }
+  .xmas-box { position: relative; width: 96px; height: 84px; margin: 8px 0 0; animation: boxBob 1.4s ease-in-out infinite; }
+  .xmas-box::before { content: ""; position: absolute; left: 6px; right: 6px; bottom: 0; height: 60px; background: linear-gradient(90deg, transparent 40%, #1f7a3a 40% 60%, transparent 60%), #d62839; border: 3px solid var(--ink); border-radius: 8px; }
+  .xmas-box::after { content: ""; position: absolute; left: 0; right: 0; top: 14px; height: 20px; background: linear-gradient(90deg, transparent 40%, #1f7a3a 40% 60%, transparent 60%), #ff4a3d; border: 3px solid var(--ink); border-radius: 6px; }
+  .xmas-box i { position: absolute; left: 50%; top: -2px; width: 44px; height: 20px; margin-left: -22px; z-index: 1; }
+  .xmas-box i::before, .xmas-box i::after { content: ""; position: absolute; top: 0; width: 20px; height: 16px; background: #2bb05a; border: 3px solid var(--ink); border-radius: 50% 50% 10% 50%; }
+  .xmas-box i::before { left: 0; transform: rotate(-20deg); }
+  .xmas-box i::after { right: 0; transform: scaleX(-1) rotate(-20deg); }
+  @keyframes boxBob { 50% { transform: translateY(-6px) rotate(-3deg); } }
+  .xmas-btn { background: #d62839; box-shadow: inset 0 -5px 0 #9b1d2a, 0 4px 0 var(--ink); }
+  .xmas-btn:active:not(:disabled) { box-shadow: inset 0 -3px 0 #9b1d2a, 0 1px 0 var(--ink); }
+  /* ---------- Tablets (iPad, Android tablets) ----------
+     Both sides at least 700px, so no phone matches in either orientation and phones keep their exact look.
+     In-flow blocks are scaled with zoom (type and tap targets grow together, widths stay centered);
+     things placed by script in pixels (tips, popups, the 3D labels) are left alone. */
+  @media (min-width: 700px) and (min-height: 700px) {
+    #hud { padding-top: calc(env(safe-area-inset-top, 0px) + 16px); padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
+    #hud .hud-row { zoom: 1.2; }
+    #hud-hint { zoom: 1.15; }
+    .home-top { zoom: 1.15; }
+    .screen { gap: 22px; padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
+    .logo { font-size: 84px; }
+    #banner { font-size: 34px; }
+    .tut { font-size: 19px; max-width: 360px; }
+    .toast { font-size: 15px; max-width: 420px; }
+    .trophy-toast { zoom: 1.15; }
+    .garland { top: calc(env(safe-area-inset-top, 0px) + 66px); height: 48px; }
+  }
+  /* Tall tablets (portrait, and the 12.9" iPad either way): everything a size up. */
+  @media (min-width: 700px) and (min-height: 960px) {
+    .screen > .card, .home-bottom, .logo-wrap, .lb-card, .cr-card, .rv-card, .op-page > *, .op-next { zoom: 1.2; }
+    .home-bottom { margin-top: 6vh; }
+  }
+  /* Short landscape tablets: the home screen sits a little higher so it never needs to scroll. */
+  @media (min-width: 700px) and (min-height: 700px) and (max-height: 959px) and (orientation: landscape) {
+    .home-bottom { margin-top: 3vh; }
+    .logo { font-size: 72px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .garland i, .xmas-box, .tcard.r-e .tcard-art::after { animation: none; }
+    .won-card, .fly-coin, .won-card.melt .won-card-slot .tcard { animation-duration: 0.01s; }
+  }
 </style>
 
 <canvas id="game" aria-label="Game view"></canvas>
@@ -834,6 +1014,10 @@
 <div id="popups" aria-hidden="true"></div>
 
 <section id="screen-home" class="screen" aria-label="Home">
+  <div id="xmas-garland" class="garland" aria-hidden="true" hidden>
+    <svg viewBox="0 0 400 40" preserveAspectRatio="none"><path d="M0 6 Q50 34 100 10 T200 10 T300 10 T400 6" fill="none" stroke="#1f7a3a" stroke-width="7" stroke-linecap="round"/><path d="M0 6 Q50 34 100 10 T200 10 T300 10 T400 6" fill="none" stroke="#2bb05a" stroke-width="3" stroke-dasharray="2 7" stroke-linecap="round"/></svg>
+    <i style="left:6%;top:15px"></i><i style="left:15%;top:24px"></i><i style="left:24%;top:22px"></i><i style="left:33%;top:13px"></i><i style="left:42%;top:15px"></i><i style="left:51%;top:20px"></i><i style="left:60%;top:16px"></i><i style="left:69%;top:12px"></i><i style="left:78%;top:18px"></i><i style="left:87%;top:17px"></i><i style="left:95%;top:9px"></i>
+  </div>
   <div class="home-top">
     <div class="home-left">
       <span class="chip"><span class="coin-icon" aria-hidden="true"></span><span data-wallet>0</span></span>
@@ -865,6 +1049,17 @@
       <button id="btn-shop" class="btn btn-gold" type="button" data-i18n="shop">Shop</button>
       <button id="btn-missions" class="btn btn-teal" type="button"><span data-i18n="missions.button">Missions</span><span id="missions-badge" class="badge-dot" hidden>0</span></button>
       <button id="btn-pass" class="btn btn-pass" type="button"><span data-i18n="pass.button">Pass</span><span id="pass-badge" class="badge-dot" hidden>0</span></button>
+    </div>
+    <div class="event-row">
+      <button id="btn-bossweek" class="bw-card" type="button" hidden>
+        <span class="bw-art" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M12 14l3-9 5 6 4-8 4 8 5-6 3 9z" fill="#ffbe2e" stroke="#2b2140" stroke-width="3" stroke-linejoin="round"/><circle cx="24" cy="28" r="15" fill="#34324a" stroke="#2b2140" stroke-width="3"/><rect x="13" y="24" width="22" height="7" rx="3.5" fill="#ff3df2"/></svg></span>
+        <span class="bw-text"><b data-i18n="bw.title">Boss Week</b><small id="bw-time"></small></span>
+        <span id="bw-reward" class="bw-reward"></span>
+      </button>
+      <button id="btn-album" class="album-tile" type="button">
+        <span class="album-icon" aria-hidden="true"><i></i><i></i></span><span data-i18n="album.button">Cards</span>
+        <span id="album-badge" class="badge-dot" hidden>0</span>
+      </button>
     </div>
     <div class="promo-row">
     <button class="promo" id="btn-promo" type="button">
@@ -903,6 +1098,11 @@
     <h2 id="won-level">Level cleared</h2>
     <p class="lede" data-i18n="won.lede">Exactly like the ad. Except it was real.</p>
     <div class="reward"><small data-i18n="coinsEarned">Coins earned</small><span id="won-xp" class="xp-tag"></span><strong><span class="coin-icon" aria-hidden="true"></span><span id="won-coins">+0</span></strong><span id="won-mult" class="mult-tag" hidden>x2 bonus</span></div>
+    <p id="won-event" class="won-event" hidden></p>
+    <div id="won-card" class="won-card" hidden>
+      <div id="won-card-slot" class="won-card-slot"></div>
+      <div class="won-card-text"><small id="won-card-kicker"></small><b id="won-card-name"></b><span id="won-card-extra"></span></div>
+    </div>
     <button id="btn-ad-triple" class="btn btn-ad" type="button"><span class="ad-chip" aria-hidden="true">AD</span><span data-i18n="adTriple">Get x3 coins</span></button>
     <button id="btn-next" class="btn btn-big" type="button" data-i18n="nextLevel">Next level</button>
     <div class="btn-row">
@@ -988,6 +1188,41 @@
 </section>
 
 <div id="tut" class="tut" hidden><span id="tut-text"></span></div>
+<div id="toast" class="toast" role="status" hidden></div>
+
+<section id="screen-album" class="screen screen-dim" aria-label="Card album" data-i18n-label="album.title" hidden>
+  <div class="card album-card">
+    <div class="shop-head">
+      <h2 data-i18n="album.title">Card album</h2>
+      <span id="album-count" class="chip">0/24</span>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Card sets" data-i18n-label="album.title">
+      <button type="button" role="tab" data-set="arsenal" aria-selected="true" data-i18n="set.arsenal">Arsenal</button>
+      <button type="button" role="tab" data-set="enemies" aria-selected="false" data-i18n="set.enemies">Enemies</button>
+      <button type="button" role="tab" data-set="traps" aria-selected="false" data-i18n="set.traps">Traps</button>
+      <button type="button" role="tab" data-set="bosses" aria-selected="false" data-i18n="set.bosses">Bosses</button>
+    </div>
+    <div class="album-prog"><div class="bar" aria-hidden="true"><div id="album-bar"></div></div><span id="album-prog-text">0/6</span></div>
+    <p id="album-reward" class="album-reward"></p>
+    <div id="album-grid" class="album-grid"></div>
+    <p class="album-hint" data-i18n="album.hint">Win levels to find cards. World bosses always drop one.</p>
+    <button id="btn-album-close" class="btn btn-plain" type="button" data-i18n="pass.close">Close</button>
+  </div>
+</section>
+
+<section id="screen-xmas" class="screen screen-dim" aria-label="Christmas gift" data-i18n-label="xmas.title" hidden>
+  <div class="card offer-card xmas-card">
+    <span class="ad-tag xmas-tag" data-i18n="xmas.tag">Merry Christmas!</span>
+    <div class="xmas-box" aria-hidden="true"><i></i></div>
+    <h2 data-i18n="xmas.title">Christmas gift</h2>
+    <p class="lede" data-i18n="xmas.lede">A present every day until 6 January.</p>
+    <div class="offer-items">
+      <span><span class="coin-icon" aria-hidden="true"></span><span id="xmas-coins">250</span></span>
+      <span id="xmas-skin"><span id="xmas-skin-swatch" class="swatch small" aria-hidden="true"></span><span data-i18n="xmas.skin">+ free Festive look</span></span>
+    </div>
+    <button id="btn-xmas-claim" class="btn btn-big xmas-btn" type="button" data-i18n="xmas.open">Open it</button>
+  </div>
+</section>
 
 <section id="screen-missions" class="screen screen-dim" aria-label="Daily missions" data-i18n-label="missions.title" hidden>
   <div class="card">

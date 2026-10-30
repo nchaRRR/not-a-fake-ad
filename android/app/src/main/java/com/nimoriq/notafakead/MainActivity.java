@@ -1,5 +1,6 @@
 package com.nimoriq.notafakead;
 
+import android.content.pm.ActivityInfo;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.WindowManager;
@@ -12,6 +13,12 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Phones stay in portrait; tablets (smallest width 600dp and up) turn with the device.
+        // The lock lives here rather than in the manifest, so tablets are not letterboxed and
+        // Android 16+ large-screen rules have nothing to override.
+        if (getResources().getConfiguration().smallestScreenWidthDp < 600) {
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        }
         // BridgeActivity switches to AppTheme.NoActionBar and creates the WebView. Edge-to-edge must
         // come AFTER that: calling it earlier builds the window with the launch (splash) theme, which
         // on Android 12+ carries a framework action bar — the empty strip at the top of the game.

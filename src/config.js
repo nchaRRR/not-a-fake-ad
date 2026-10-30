@@ -113,6 +113,17 @@ export const SKINS = [
   { id: 'camo', name: 'Camo', body: 0x6b7f3a, head: 0xd9b48f, gun: 0x3a3a22, cost: 0, pass: true },
   { id: 'neon', name: 'Neon', body: 0x19e3c3, head: 0x2b2140, gun: 0xff3df2, cost: 0, pass: true },
   { id: 'royal', name: 'Royal Guard', body: 0xc8102e, head: 0x1b1b2e, gun: 0xffd34d, cost: 0, pass: true },
+  // Christmas only: claimed for free during the season, hidden from the shop the rest of the year.
+  { id: 'festive', name: 'Festive', body: 0xd62839, head: 0xffe0c8, gun: 0x1f7a3a, cost: 0, season: 'xmas' },
+  // Boss Week: one of these for the first weekly win, in rotation.
+  { id: 'titan', name: 'Titan', body: 0x3d3d52, head: 0xffd34d, gun: 0xffbe2e, cost: 0, event: true },
+  { id: 'inferno', name: 'Inferno', body: 0xff5a1f, head: 0x2b1a1a, gun: 0xffd34d, cost: 0, event: true },
+  { id: 'phantom', name: 'Phantom', body: 0x6b5bd6, head: 0xe9e4ff, gun: 0x19e3c3, cost: 0, event: true },
+  // Card album: completing a set gives its look.
+  { id: 'steel', name: 'Steel', body: 0x8a96a8, head: 0xffd6b0, gun: 0x2b2140, cost: 0, album: 'arsenal' },
+  { id: 'crimson', name: 'Crimson', body: 0x9b1d2a, head: 0xf0c8a8, gun: 0x1b1b2e, cost: 0, album: 'enemies' },
+  { id: 'hazard', name: 'Hazard', body: 0xffd400, head: 0x2b2140, gun: 0x2b2140, cost: 0, album: 'traps' },
+  { id: 'holo', name: 'Holo', body: 0x7fe7ff, head: 0xffffff, gun: 0xff7ad9, cost: 0, album: 'bosses' },
 ];
 
 // Weapons change how the squad fights.
@@ -121,4 +132,14 @@ export const WEAPONS = [
   { id: 'shotgun', name: 'Shotgun', desc: 'Wide spray. Shreds crowds up close.', cost: 300, minLevel: 4, rate: 0.7, dmg: 1.6, pellets: 4, spread: 0.32, range: 17, len: 0.8 },
   { id: 'sniper', name: 'Sniper', desc: 'Slow, huge damage. Melts bosses.', cost: 700, minLevel: 6, rate: 0.4, dmg: 2.9, pellets: 1, spread: 0, range: 42, len: 2.2 },
   { id: 'minigun', name: 'Minigun', desc: 'Bullet hose. Raises doors fast.', cost: 1500, minLevel: 9, rate: 2.4, dmg: 0.55, pellets: 1, spread: 0.05, range: 26, len: 0.9 },
+  // Late weapons. Each trades raw damage per second (about rifle level) for one strength:
+  // shield: share of a bullet that gets through a shield plate (others: 0.25)
+  // splash: radius and share of a hit that also lands on enemies around it
+  // speed: bullet speed multiplier; look: bullet color, glow and size
+  { id: 'laser', name: 'Laser', desc: 'Long beams that cut through shields.', cost: 2200, minLevel: 11, rate: 1.5, dmg: 0.75, pellets: 1, spread: 0, range: 36, len: 1.6,
+    shield: 1, speed: 1.4, look: { color: 0x7ff6ff, glow: 0x19c8ff, w: 0.5, l: 2.2 } },
+  { id: 'rocket', name: 'Rocket', desc: 'Slow rockets that blow up whole groups.', cost: 3200, minLevel: 14, rate: 0.3, dmg: 3.4, pellets: 1, spread: 0, range: 32, len: 1.3,
+    splash: { r: 0.85, share: 0.35, max: 5 }, speed: 0.55, look: { color: 0xff6a2a, glow: 0xffc23d, w: 2.2, l: 0.75 } },
+  { id: 'flamer', name: 'Flamer', desc: 'Short range, burns through everything.', cost: 4200, minLevel: 17, rate: 3.4, dmg: 0.4, pellets: 2, spread: 0.22, range: 12, len: 0.7,
+    shield: 0.6, speed: 0.7, flame: true, look: { color: 0xffb03a, glow: 0xff4a1c, w: 1.8, l: 0.6 } },
 ];
