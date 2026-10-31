@@ -44,7 +44,7 @@ def sh(*a):
     subprocess.run(a, check=True)
 
 
-CI_PREFIXES = ('KelimeKoyu CI', 'Kostebek CI', 'NotAFakeAd CI', 'NFATower CI', 'NFAChoices CI')
+CI_PREFIXES = ('KelimeKoyu CI', 'Kostebek CI', 'NotAFakeAd CI', 'NFATower CI', 'NFAChoices CI', 'NFADraw CI', 'NFAPipes CI', 'NFARope CI', 'NFAFish CI')
 
 
 def free_oldest_ci_certificate():
