@@ -93,7 +93,7 @@ export const LEVELS = [
   { // 10. World boss with a weak point: line up, squeeze, fire when it opens.
     idea: 'weak', start: 20, kind: 'boss',
     track: [gates(add(10), add(5)), gates(mul(2), add(15)), gates(add(10), mul(2)), squad(14, 2)],
-    boss: brute(5200, { big: true, weak: true, adds: 10, addHp: 4 }), goals: [G.win, G.boss(28), G.loss(8)],
+    boss: brute(5200, { big: true, weak: true, adds: 10, addHp: 4 }), goals: [G.win, G.boss(28), G.loss(12)],
   },
 
   // ---------------------------------------------------------------- world 2: mix two ideas
