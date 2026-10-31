@@ -12,6 +12,7 @@ const DEFAULTS = {
   weapon: 'rifle',
   owned: { skins: ['blue'], weapons: ['rifle'] },
   seen: {},
+  stars: {}, // level -> best stars (0-3); levels cleared before stars existed have no entry
 };
 
 const fresh = () => JSON.parse(JSON.stringify(DEFAULTS));

@@ -182,7 +182,7 @@ export const LEVELS = [
   { // 27. Order on lanes, then a bridge cap
     idea: 'mix', start: 14,
     track: [lanes([mul(2), add(12)], [add(12), mul(2)]), lanes([add(8), mul(2)], [mul(2), add(8)]), bridge({ min: 100, max: 120, w: 3.8 }), gates(add(10), add(20)), squad(22, 3)],
-    boss: brute(5600, { weak: true }), goals: [G.win, G.min(120), G.loss(4)],
+    boss: brute(5600, { weak: true }), goals: [G.win, G.min(120), G.loss(14)],
   },
   { // 28. Chest behind switches and a target
     idea: 'mix', start: 12,
@@ -192,12 +192,12 @@ export const LEVELS = [
   { // 29. Everything: lanes, shop, bridge, hostages
     idea: 'mix', start: 16,
     track: [lanes([add(4, { hostages: 6 }), mul(2)], [mul(2), add(4)]), shop([{ id: 'rate', val: 0.5, cost: 10 }, { id: 'rocket', cost: 14 }]), bridge({ min: 30, max: 44, w: 2.8 }), gates(mul(2), add(4, { hostages: 6 })), squad(24, 3)],
-    boss: swarm(3600), goals: [G.hostages, G.win, G.boss(36)],
+    boss: swarm(2600), goals: [G.hostages, G.win, G.boss(40)],
   },
   { // 30. World boss: a swarm queen. Rockets clear the adds.
     idea: 'mix', start: 20, kind: 'boss',
     track: [gates(mul(2), add(20)), lanes([add(10), mul(2)], [mul(2), add(10)]), shop([{ id: 'rocket', cost: 16 }, { id: 'rate', val: 0.5, cost: 14 }]), door(2.2), squad(24, 3)],
-    boss: swarm(6000, { big: true }), goals: [G.win, G.boss(46), G.min(60)],
+    boss: swarm(4400, { big: true }), goals: [G.win, G.boss(48), G.min(50)],
   },
 ];
 

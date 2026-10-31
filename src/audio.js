@@ -152,6 +152,24 @@ export const sfx = {
     tone(990, 0.14, 'triangle', 0.1, 0, 0.07);
   },
   tap: () => tone(460, 0.05, 'triangle', 0.07),
+  // Puzzle sounds. A multiplier door rings higher the bigger it is.
+  gateMul: (v = 2) => {
+    whoosh();
+    const f = 523 * Math.pow(2, Math.min(v, 5) / 6);
+    tone(f, 0.08, 'triangle', 0.11);
+    tone(f * 1.26, 0.08, 'triangle', 0.1, 0, 0.06);
+    tone(f * 1.5, 0.2, 'triangle', 0.1, 0, 0.12);
+  },
+  key: () => { tone(1318, 0.07, 'triangle', 0.09); tone(1760, 0.18, 'sine', 0.08, 0, 0.06); },
+  unlock: () => { tone(220, 0.06, 'square', 0.06); tone(880, 0.1, 'triangle', 0.1, 0, 0.07); tone(1175, 0.2, 'triangle', 0.1, 0, 0.14); },
+  locked: () => { tone(180, 0.12, 'square', 0.07); tone(150, 0.16, 'square', 0.06, 0, 0.1); },
+  rescue: () => { tone(587, 0.1, 'triangle', 0.1); tone(740, 0.1, 'triangle', 0.1, 0, 0.09); tone(880, 0.22, 'triangle', 0.1, 0, 0.18); },
+  target: () => { tone(784, 0.1, 'sine', 0.12); tone(1046, 0.1, 'sine', 0.12, 0, 0.1); tone(1568, 0.3, 'sine', 0.1, 0, 0.2); },
+  miss: () => { tone(392, 0.16, 'triangle', 0.1, -40); tone(330, 0.3, 'triangle', 0.1, -60, 0.14); },
+  crit: () => tone(1500 + Math.random() * 200, 0.04, 'square', 0.03, 600),
+  creak: () => { tone(70, 0.5, 'sawtooth', 0.08, 30); noise(0.25, 0.06); },
+  shape: (squeeze) => tone(squeeze ? 700 : 420, 0.09, 'triangle', 0.07, squeeze ? 400 : -150),
+  star: (i) => { const f = 659 * Math.pow(2, (i * 4) / 12); tone(f, 0.1, 'triangle', 0.12); tone(f * 2, 0.25, 'sine', 0.06, 0, 0.06); },
   roar: () => {
     tone(110, 0.7, 'sawtooth', 0.12, -50);
     tone(82, 0.8, 'square', 0.06, -30, 0.05);

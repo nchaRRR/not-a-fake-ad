@@ -991,6 +991,144 @@
     .garland i, .xmas-box, .tcard.r-e .tcard-art::after { animation: none; }
     .won-card, .fly-coin, .won-card.melt .won-card-slot .tcard { animation-duration: 0.01s; }
   }
+  /* ---------- Puzzle layer ---------- */
+  .hud-mid #hud-goals { display: flex; gap: 4px; }
+  #hud-goals i, .goal-star, .lv-stars i, #won-stars .star {
+    display: inline-block; width: 16px; height: 16px; background: var(--gold);
+    clip-path: polygon(50% 0, 62% 35%, 100% 38%, 70% 60%, 80% 98%, 50% 76%, 20% 98%, 30% 60%, 0 38%, 38% 35%);
+    filter: drop-shadow(0 0 0 var(--ink));
+  }
+  #hud-goals i { width: 18px; height: 18px; background: var(--gold); outline: none; }
+  #hud-goals i.off { background: #b9aec9; }
+  .hud-chips { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); top: calc(env(safe-area-inset-top, 0px) + 104px); display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .chip-target { font-size: 16px; padding: 2px 12px; background: var(--gold); }
+  .chip-target.ok { background: #7ce3a8; }
+  .chip-target.high { background: #ffb0a8; }
+  .chip-key { font-size: 17px; padding: 2px 12px 2px 8px; }
+  .key-icon { width: 20px; height: 12px; border: 3px solid var(--ink); border-radius: 99px 3px 3px 99px; background: var(--gold); position: relative; flex: none; }
+  .key-icon::after { content: ""; position: absolute; right: -9px; top: 1px; width: 8px; height: 4px; background: var(--ink); }
+  .chip-clock { font-size: 16px; padding: 2px 12px; }
+  .chip-clock.late { background: #ffb0a8; }
+
+  #shape-ctl {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+    display: flex; gap: 10px; pointer-events: auto;
+  }
+  #shape-ctl button {
+    pointer-events: auto; display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--font-display); font-weight: 800; font-size: 18px; line-height: 1; color: var(--ink);
+    background: var(--paper); border: 3px solid var(--ink); border-radius: 18px; padding: 10px 14px 8px;
+    box-shadow: 0 4px 0 var(--ink); cursor: pointer; min-height: 52px; touch-action: manipulation;
+  }
+  #shape-ctl button[aria-pressed="true"] { background: var(--gold); transform: translateY(2px); box-shadow: 0 2px 0 var(--ink); }
+  #shape-ctl .sh-icon { display: inline-flex; gap: 2px; align-items: center; }
+  #shape-ctl .sh-icon i { display: block; width: 7px; height: 7px; border-radius: 50%; background: var(--blue); border: 2px solid var(--ink); }
+  #shape-ctl .sq .sh-icon { flex-direction: column; gap: 1px; }
+  #shape-ctl.teach button { animation: shapePulse 0.9s ease-in-out infinite; }
+  @keyframes shapePulse { 50% { transform: scale(1.08); background: #fff2b8; } }
+
+  #popats { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .popat {
+    position: absolute; transform: translate(-50%, -50%); font-family: var(--font-display); font-weight: 800; font-size: 30px;
+    color: #fff; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; text-shadow: 0 3px 0 var(--ink);
+    animation: popat 1s ease-out forwards; white-space: nowrap;
+  }
+  .popat.good { color: #9cc4ff; }
+  .popat.bad { color: #ffb0a8; }
+  .popat.gun { color: #ffd08a; }
+  .popat.crit { color: #ffe14d; font-size: 26px; }
+  @keyframes popat {
+    0% { transform: translate(-50%, -30%) scale(0.5); opacity: 0; }
+    15% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+    30% { transform: translate(-50%, -55%) scale(1); }
+    100% { transform: translate(-50%, -160%) scale(0.95); opacity: 0; }
+  }
+
+  #confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 6; }
+  #confetti i { position: absolute; top: -20px; width: 10px; height: 16px; border: 2px solid var(--ink); border-radius: 3px; animation: confetti 2s ease-in forwards; }
+  @keyframes confetti { to { transform: translate(var(--dx), 110vh) rotate(var(--r)); } }
+
+  /* Overhead preview: goals card on top, skip hint at the bottom. */
+  #preview { position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: space-between; align-items: center;
+    padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px calc(env(safe-area-inset-bottom, 0px) + 22px); cursor: pointer; }
+  .pv-card { width: min(100%, 360px); background: var(--paper); border: 3px solid var(--ink); border-radius: 20px; box-shadow: 0 5px 0 var(--ink); padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; animation: pvIn 0.4s ease-out; }
+  @keyframes pvIn { from { transform: translateY(-20px); opacity: 0; } }
+  .pv-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .pv-head h2 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 22px; line-height: 1.1; }
+  .pv-tag { font-family: var(--font-display); font-weight: 800; font-size: 14px; background: var(--gold); border: 3px solid var(--ink); border-radius: 999px; padding: 1px 10px 0; transform: rotate(-3deg); white-space: nowrap; }
+  #pv-idea { margin: 0; font-weight: 800; font-size: 15px; color: var(--ink-soft); text-wrap: balance; }
+  .pv-skip { font-family: var(--font-display); font-weight: 800; font-size: 20px; background: var(--paper); border: 3px solid var(--ink); border-radius: 999px; padding: 6px 18px 4px; box-shadow: 0 4px 0 var(--ink); animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { transform: scale(1.06); } }
+  .goal-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .goal { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 16px; background: #fff; border: 3px solid var(--ink); border-radius: 12px; padding: 5px 10px; }
+  .goal .goal-star { width: 22px; height: 22px; flex: none; }
+  .goal .goal-text { flex: 1; text-wrap: balance; line-height: 1.15; }
+  .goal .goal-mark { font-family: var(--font-display); font-size: 20px; width: 20px; text-align: center; }
+  .goal.ok { background: #e2f9ec; }
+  .goal.ok .goal-mark { color: #1f9a57; }
+  .goal.no { background: #f3eef8; color: var(--ink-soft); }
+  .goal.no .goal-star { background: #b9aec9; }
+  .goal.no .goal-mark { color: var(--red); }
+
+  /* Boss intro: letterbox bars and a name plate. */
+  #cine { position: fixed; inset: 0; pointer-events: auto; z-index: 4; }
+  #cine::before, #cine::after { content: ""; position: absolute; left: 0; right: 0; height: 13vh; background: var(--ink); transform: scaleY(0); transition: transform 0.35s ease; }
+  #cine::before { top: 0; transform-origin: top; }
+  #cine::after { bottom: 0; transform-origin: bottom; }
+  #cine.go::before, #cine.go::after { transform: scaleY(1); }
+  .cine-plate { position: absolute; left: 50%; bottom: calc(13vh + 18px); width: min(calc(100% - 32px), 360px); transform: translateX(-50%) rotate(-2deg);
+    background: var(--red); color: #fff; border: 3px solid var(--ink); border-radius: 16px; box-shadow: 0 5px 0 var(--ink); padding: 10px 14px 8px; text-align: center; animation: plate 0.5s 0.25s ease-out both; }
+  @keyframes plate { from { transform: translateX(-50%) rotate(-2deg) scale(0.4); opacity: 0; } }
+  .cine-plate small { display: block; font-weight: 800; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.9; }
+  .cine-plate b { display: block; font-family: var(--font-display); font-weight: 800; font-size: 30px; line-height: 1.05; -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill; }
+  .cine-plate span { display: block; font-weight: 800; font-size: 15px; margin-top: 4px; text-wrap: balance; }
+
+  /* Mid-run shop */
+  .rs-list { display: flex; flex-direction: column; gap: 10px; }
+  .rs-offer { display: flex; align-items: center; gap: 10px; text-align: left; font: inherit; color: var(--ink); background: #fff; border: 3px solid var(--ink); border-radius: 16px; padding: 10px 12px; box-shadow: 0 4px 0 var(--ink); cursor: pointer; }
+  .rs-offer:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  .rs-offer:disabled { opacity: 0.5; filter: grayscale(0.7); cursor: default; }
+  .rs-text { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .rs-text b { font-family: var(--font-display); font-size: 20px; line-height: 1.05; }
+  .rs-text small { font-weight: 700; font-size: 13px; color: var(--ink-soft); line-height: 1.2; }
+  .rs-cost { font-family: var(--font-display); font-weight: 800; font-size: 17px; color: #fff; background: var(--red); border: 3px solid var(--ink); border-radius: 12px; padding: 4px 8px 2px; white-space: nowrap; }
+  .rs-up { width: 44px; height: 44px; flex: none; display: grid; place-items: center; font-family: var(--font-display); font-size: 26px; background: var(--gold); border: 3px solid var(--ink); border-radius: 12px; }
+  .rs-boss { margin: 0; text-align: center; font-weight: 800; font-size: 14px; background: #ffe9e6; border: 3px dashed var(--red); border-radius: 12px; padding: 6px 10px; text-wrap: balance; }
+  .rs-have { margin: 0; text-align: center; font-weight: 800; color: var(--ink-soft); }
+
+  /* End screens can be taller than a phone: centre them when they fit, scroll from the top when not. */
+  #screen-won, #screen-lost, #screen-runshop { justify-content: flex-start; }
+  #screen-won > .card, #screen-lost > .card, #screen-runshop > .card { margin-block: auto; }
+  /* Results: stars */
+  #won-stars { display: flex; justify-content: center; gap: 8px; margin-top: -4px; }
+  #won-stars .star { width: 54px; height: 54px; background: #d9d0e6; transition: transform 0.25s cubic-bezier(.3,1.8,.5,1), background 0.1s; }
+  #won-stars .star:nth-child(2) { transform: translateY(-10px); width: 64px; height: 64px; }
+  #won-stars .star.on { background: var(--gold); transform: scale(1.12); }
+  #won-stars .star:nth-child(2).on { transform: translateY(-10px) scale(1.12); }
+  .won-best { margin: 0; text-align: center; font-family: var(--font-display); font-weight: 800; color: var(--blue-deep); }
+
+  /* Level map */
+  .lv-btn { pointer-events: auto; font-family: var(--font-display); font-weight: 800; font-size: 16px; color: var(--ink); background: var(--gold); border: 3px solid var(--ink); border-radius: 999px; padding: 2px 12px 0; box-shadow: 0 3px 0 var(--ink); cursor: pointer; }
+  .levels-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-height: 52vh; overflow-y: auto; padding: 4px; }
+  .lv-cell { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font: inherit; color: var(--ink); background: #fff; border: 3px solid var(--ink); border-radius: 14px; box-shadow: 0 3px 0 var(--ink); cursor: pointer; padding: 0; }
+  .lv-cell b { font-family: var(--font-display); font-size: 20px; line-height: 1; }
+  .lv-cell.boss { background: #ffe1dc; }
+  .lv-cell.next { background: var(--gold); }
+  .lv-cell:disabled { opacity: 0.45; cursor: default; }
+  .lv-stars { display: flex; gap: 1px; min-height: 12px; }
+  .lv-stars i { width: 12px; height: 12px; background: #d9d0e6; }
+  .lv-stars i.on { background: var(--gold); }
+  .lv-stars em { font-style: normal; font-weight: 800; font-size: 12px; color: #1f9a57; }
+  @media (max-height: 700px) {
+    .goal { font-size: 14px; padding: 3px 8px; }
+    #won-stars .star { width: 42px; height: 42px; }
+    #won-stars .star:nth-child(2) { width: 50px; height: 50px; }
+    .pv-card { padding: 10px 12px; gap: 6px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .popat, #confetti i, .pv-skip, #shape-ctl.teach button, .cine-plate { animation-duration: 0.01s; animation-iteration-count: 1; }
+  }
 </style>
 
 <canvas id="game" aria-label="Game view"></canvas>
@@ -1001,12 +1139,37 @@
     <div class="hud-mid">
       <span id="hud-level" class="chip chip-level">Level 1</span>
       <div class="bar" aria-hidden="true"><div id="hud-progress"></div></div>
+      <div id="hud-goals" aria-hidden="true" hidden></div>
     </div>
     <button id="btn-pause" class="icon-btn" type="button" aria-label="Pause" data-i18n-label="pause">
       <svg viewBox="0 0 18 18" aria-hidden="true"><rect x="3" y="2" width="4" height="14" rx="1.5"></rect><rect x="11" y="2" width="4" height="14" rx="1.5"></rect></svg>
     </button>
   </div>
+  <div class="hud-chips">
+    <span id="hud-target" class="chip chip-target" hidden><span id="hud-target-text"></span></span>
+    <span id="hud-keys" class="chip chip-key" hidden><span class="key-icon" aria-hidden="true"></span><span id="hud-keys-n">×1</span></span>
+    <span id="hud-clock" class="chip chip-clock" hidden></span>
+  </div>
   <div id="hud-hint"><span class="hand" aria-hidden="true"></span><span id="hint-text">Drag to pick a door. Shoot doors to raise them.</span></div>
+  <div id="shape-ctl" hidden>
+    <button type="button" class="sq" data-shape="squeeze" aria-pressed="false"><span class="sh-icon" aria-hidden="true"><i></i><i></i><i></i></span><span data-i18n="shape.squeeze">Squeeze</span></button>
+    <button type="button" class="sp" data-shape="spread" aria-pressed="false"><span class="sh-icon" aria-hidden="true"><i></i><i></i><i></i></span><span data-i18n="shape.spread">Spread</span></button>
+  </div>
+</div>
+<div id="popats" aria-hidden="true"></div>
+<div id="confetti" aria-hidden="true" hidden></div>
+
+<div id="preview" role="dialog" aria-labelledby="pv-title" hidden>
+  <div class="pv-card">
+    <div class="pv-head"><h2 id="pv-title">Level 1</h2><span class="pv-tag" data-i18n="pv.plan">Plan your route</span></div>
+    <p id="pv-idea" hidden></p>
+    <ul id="pv-goals" class="goal-list"></ul>
+  </div>
+  <span class="pv-skip" data-i18n="pv.skip">Tap to start</span>
+</div>
+
+<div id="cine" hidden>
+  <div class="cine-plate"><small id="cine-kicker">Boss</small><b id="cine-name">The Brute</b><span id="cine-hint"></span></div>
 </div>
 
 <div id="flash" aria-hidden="true"></div>
@@ -1043,7 +1206,7 @@
     <p class="tagline" data-i18n="tagline">The game from those ads. Actually playable.</p>
   </div>
   <div class="home-bottom">
-    <p class="world-line"><span id="home-world">World 1</span><span id="home-kind" class="kind-tag" hidden></span></p>
+    <p class="world-line"><span id="home-world">World 1</span><span id="home-kind" class="kind-tag" hidden></span><button id="btn-levels" class="lv-btn" type="button"><span id="levels-label">★ 0</span></button></p>
     <button id="btn-play" class="btn btn-big" type="button"><span id="play-label">Play level 1</span></button>
     <div class="btn-row three">
       <button id="btn-shop" class="btn btn-gold" type="button" data-i18n="shop">Shop</button>
@@ -1096,7 +1259,9 @@
 <section id="screen-won" class="screen screen-dim" aria-label="Level cleared" hidden>
   <div class="card">
     <h2 id="won-level">Level cleared</h2>
-    <p class="lede" data-i18n="won.lede">Exactly like the ad. Except it was real.</p>
+    <div id="won-stars" role="img"><span class="star"></span><span class="star"></span><span class="star"></span></div>
+    <p id="won-best" class="won-best" data-i18n="stars.best" hidden>New best!</p>
+    <ul id="won-goals" class="goal-list"></ul>
     <div class="reward"><small data-i18n="coinsEarned">Coins earned</small><span id="won-xp" class="xp-tag"></span><strong><span class="coin-icon" aria-hidden="true"></span><span id="won-coins">+0</span></strong><span id="won-mult" class="mult-tag" hidden>x2 bonus</span></div>
     <p id="won-event" class="won-event" hidden></p>
     <div id="won-card" class="won-card" hidden>
@@ -1117,6 +1282,7 @@
   <div class="card">
     <h2 data-i18n="lost.title">You were the 99%</h2>
     <p id="lost-line" class="lede">Outnumbered.</p>
+    <ul id="lost-goals" class="goal-list"></ul>
     <div class="reward"><small data-i18n="coinsKept">Coins kept</small><span id="lost-xp" class="xp-tag"></span><strong><span class="coin-icon" aria-hidden="true"></span><span id="lost-coins">+0</span></strong></div>
     <button id="btn-ad-revive" class="btn btn-ad" type="button"><span class="ad-chip" aria-hidden="true">AD</span><span data-i18n="adRevive">Revive</span></button>
     <button id="btn-retry" class="btn btn-big" type="button" data-i18n="retry">Try again</button>
@@ -1124,6 +1290,26 @@
       <button id="btn-lost-shop" class="btn btn-gold" type="button" data-i18n="shop">Shop</button>
       <button id="btn-lost-home" class="btn btn-plain" type="button" data-i18n="home">Home</button>
     </div>
+  </div>
+</section>
+
+<section id="screen-runshop" class="screen screen-dim" aria-label="Shop" data-i18n-label="rs.title" hidden>
+  <div class="card">
+    <h2 data-i18n="rs.title">Roadside shop</h2>
+    <p class="lede" data-i18n="rs.lede">Pay with soldiers. Choose well.</p>
+    <p id="rs-boss" class="rs-boss"></p>
+    <div id="rs-list" class="rs-list"></div>
+    <p id="rs-have" class="rs-have"></p>
+    <button id="btn-rs-skip" class="btn btn-plain" type="button" data-i18n="rs.skip">Keep my soldiers</button>
+  </div>
+</section>
+
+<section id="screen-levels" class="screen screen-dim" aria-label="Levels" data-i18n-label="lv.title" hidden>
+  <div class="card">
+    <div class="shop-head"><h2 data-i18n="lv.title">Levels</h2><span id="levels-total" class="chip">★ 0</span></div>
+    <p class="lede" data-i18n="lv.lede">Play any level again for more stars.</p>
+    <div id="levels-grid" class="levels-grid"></div>
+    <button id="btn-levels-close" class="btn btn-plain" type="button" data-i18n="pass.close">Close</button>
   </div>
 </section>
 

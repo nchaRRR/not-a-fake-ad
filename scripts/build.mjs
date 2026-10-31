@@ -21,7 +21,7 @@ async function bundle(cloud) {
   const result = await esbuild.build({
     entryPoints: [resolve(root, 'src/main.js')],
     bundle: true,
-    minify: true,
+    minify: !process.env.NFA_DEBUG, // NFA_DEBUG=1 keeps names readable for debugging
     format: 'iife',
     target: ['es2020', 'safari15'],
     write: false,

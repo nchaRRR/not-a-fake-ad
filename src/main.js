@@ -9,7 +9,10 @@ import { startMusic, setMusicIntensity, setMusicEnabled, duckMusic } from './mus
 import { createWorld } from './world.js';
 import { FigureSet, corpseGeo } from './figures.js';
 import { makeGatePanel, makeCountLabel, makeHealthLabel, makeFloorLabel } from './labels.js';
-import { buildLevel, levelKind, buildBossWeekLevel } from './level.js';
+import { buildLevel, levelKind, buildBossWeekLevel, levelDef } from './level.js';
+import { slot as formationSlot, LANE, BOSS_RULES, opText, goalMet } from './rules.js';
+import { createProps, SHARED as PROP_SHARED, makeKeyMesh } from './props.js';
+import { HAND_LEVELS } from './levels.js';
 import { themeFor, worldNumber } from './themes.js';
 import { createAds } from './ads.js';
 import { createPayments, PRODUCTS } from './payments.js';
@@ -137,6 +140,7 @@ const KIND_LOOK = {
   mini: { body: new THREE.Color(0xb07ae8), helmet: new THREE.Color(0x4a1f78), scale: 0.72, run: 15 },
   medic: { body: new THREE.Color(0xf4f1ea), helmet: new THREE.Color(0x1fae6a), scale: 1.08, run: 10 },
 };
+const HOSTAGE_LOOK = { body: new THREE.Color(0x2bd47a), helmet: new THREE.Color(0xfff7ef) };
 const MARK_MAX = 1200;
 const marks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff }), MARK_MAX);
 marks.count = 0;
@@ -301,7 +305,7 @@ const corpses = new Pool(() => {
 // What the current graphics tier allows (see perf.js).
 let fx = QUALITY_TIERS[0];
 
-function corpse(x, z, kind, power = 1) {
+function corpse(x, z, kind, power = 1, how = 'hit') {
   if (corpses.active.length > fx.corpses) return;
   const m = corpses.get();
   m.material = corpseMats[kind];
@@ -309,9 +313,12 @@ function corpse(x, z, kind, power = 1) {
   m.rotation.set(0, 0, 0);
   m.scale.setScalar(1);
   const u = m.userData;
-  u.v.set(rand(-1.6, 1.6) * power, rand(3, 5.5) * power, rand(-0.6, 1.8) * power);
+  u.fall = how === 'fall';
+  // Lost soldiers fly off away from the middle of the track; fallen ones drop into the pit.
+  if (u.fall) u.v.set(rand(-0.6, 0.6), rand(0.5, 1.5), rand(-0.3, 0.6));
+  else u.v.set((rand(-1.6, 1.6) + Math.sign(x || 1) * (power > 1 ? 1.8 : 0)) * power, rand(3, 5.5) * power, rand(-0.6, 1.8) * power);
   u.spin.set(rand(-12, 12), rand(-6, 6), rand(-12, 12));
-  u.life = rand(0.7, 1.0);
+  u.life = u.fall ? 1.1 : rand(0.7, 1.0);
 }
 
 function flash(kind) {
@@ -337,14 +344,14 @@ function burst(x, y, z, count, mats, power = 5, size = [0.06, 0.16]) {
 }
 
 // ================================================================ looks and loadout
-function applyLoadout() {
+function applyLoadout(runWeapon = null) {
   const skin = skinById(save.skin);
   allyMesh.setColors({
     body: skin.body, head: skin.head, gun: skin.gun,
     helmet: shade(skin.body, 0.65), pack: shade(skin.body, 0.55), legs: shade(skin.gun, 1),
   });
   sparkMats.ally.color.setHex(skin.body);
-  const w = weaponById(save.weapon);
+  const w = runWeapon || weaponById(save.weapon);
   allyMesh.gun.geometry = gunGeos[w.id];
   // Newer weapons fire bullets of their own color and size.
   bulletMesh.material.color.setHex(w.look ? w.look.color : COLORS.bullet);
@@ -375,7 +382,7 @@ const game = {
   bonus: null,
   slowmo: 0,
 };
-const crowd = { x: 0, target: 0, units: [] };
+const crowd = { x: 0, target: 0, units: [], lane: null };
 const bullets = [];
 let gatePairs = [];
 let squads = [];
@@ -389,10 +396,74 @@ const countLabel = makeCountLabel(1.1);
 scene.add(countLabel);
 
 // ================================================================ crowd
+// Formation slots follow the squad's shape (see rules.js): squeeze, normal or spread.
 function slotOffset(i) {
-  const r = RUN.slot * Math.sqrt(i + 0.5) * 1.15;
-  const a = i * 2.39996;
-  return [Math.cos(a) * r, Math.sin(a) * r * 0.85];
+  return formationSlot(i, game.shape || 'normal');
+}
+
+// A soldier's x on the track: inside the track, and inside its lane while the track is split.
+function unitX(u) {
+  const x = crowd.x + u.ox;
+  if (crowd.lane) return Math.max(crowd.lane[0] + 0.12, Math.min(crowd.lane[1] - 0.12, x));
+  return clampX(x);
+}
+
+function setShape(shape, quiet = false) {
+  if (!['squeeze', 'normal', 'spread'].includes(shape)) shape = 'normal';
+  if (game.shape === shape && !quiet) shape = 'normal';
+  game.shape = shape;
+  crowd.units.forEach((u, i) => { [u.tx, u.tz] = slotOffset(i); });
+  for (const b of document.querySelectorAll('[data-shape]')) b.setAttribute('aria-pressed', String(b.dataset.shape === shape));
+  if (!quiet) {
+    sfx.shape(shape === 'squeeze');
+    buzz(8);
+    game.shapeUsed = true;
+  }
+}
+
+// Lane walls: while the track is split, the squad stays on its side.
+function setLane(side) {
+  crowd.lane = side ? LANE[side] : null;
+  game.inFork = !!side;
+  if (side) {
+    const [a, b] = LANE[side];
+    crowd.target = Math.max(a + 0.55, Math.min(b - 0.55, crowd.target));
+  }
+}
+
+// Soldiers removed by a hazard: test(x, z) says which ones. They fly off (or fall) where they stood.
+function killUnits(test, how = 'hit', reason = 'lose.wall') {
+  if (game.mode !== 'playing') return 0;
+  const units = crowd.units;
+  if (!units.length) return 0;
+  const dead = [];
+  for (let i = 0; i < units.length; i++) if (test(unitX(units[i]), units[i].oz)) dead.push(i);
+  if (!dead.length) return 0;
+  const loss = units.length >= game.count ? dead.length : Math.max(1, Math.round((game.count * dead.length) / units.length));
+  let sx = 0;
+  for (let k = dead.length - 1; k >= 0; k--) {
+    const u = units[dead[k]];
+    const x = unitX(u);
+    sx += x;
+    corpse(x, u.oz, 'ally', how === 'fall' ? 0.5 : 1.3, how);
+    units.splice(dead[k], 1);
+  }
+  units.forEach((u, i) => { [u.tx, u.tz] = slotOffset(i); });
+  game.count = Math.max(0, game.count - loss);
+  game.lost += loss;
+  if (game.lossLog) game.lossLog.push([Math.round(game.traveled), loss, `${reason} cx=${crowd.x.toFixed(2)} ${game.shape} n=${units.length + dead.length}`]);
+  syncCrowd();
+  const cx = sx / dead.length;
+  burst(cx, 0.4, 0, Math.min(10, 2 + dead.length), [sparkMats.ally, sparkMats.fire[0]], 4);
+  game.lossAcc = (game.lossAcc || 0) + loss;
+  if (!game.lossPopT) game.lossPopT = 0.18;
+  game.lossPopX = cx;
+  sfx.hit();
+  game.shake = Math.max(game.shake, Math.min(0.4, 0.12 + loss * 0.02));
+  if (loss >= 6) hitStop(0.06);
+  buzz(loss >= 6 ? [30, 20, 30] : 20);
+  if (game.count <= 0) loseLevel(reason);
+  return loss;
 }
 
 function crowdRadius() {
@@ -404,7 +475,7 @@ function syncCrowd() {
   const units = crowd.units;
   while (units.length > want) {
     const u = units.pop();
-    corpse(clampX(crowd.x + u.ox), u.oz, 'ally');
+    corpse(unitX(u), u.oz, 'ally');
     burst(crowd.x + u.ox, 0.35, u.oz, 1, sparkMats.ally, 3);
   }
   while (units.length < want) {
@@ -413,8 +484,13 @@ function syncCrowd() {
   }
 }
 
-function setCount(n) {
-  game.count = Math.max(0, n);
+function setCount(n, trade = false) {
+  n = Math.max(0, n);
+  if (n < game.count && !trade && game.mode === 'playing') {
+    game.lost += game.count - n;
+    if (game.lossLog) game.lossLog.push([Math.round(game.traveled), Math.round(game.count - n), (new Error().stack || '').split('\n')[2]]);
+  }
+  game.count = n;
   if (game.count > (game.peak || 0)) {
     game.peak = game.count;
     if (game.mode === 'playing' || game.mode === 'bonus') record('bestArmy', Math.round(game.count));
@@ -429,6 +505,11 @@ function spawnGatePair(ev, z) {
   const sides = ev.moving ? [[0, ev.left]] : [[-1, ev.left], [1, ev.right]];
   for (const [side, spec] of sides) {
     const x = side * (HALF_W / 2);
+    // An empty side of a door row (or of a lane): walk through, nothing changes.
+    if (!spec) { pair.gates.push({ x, w, spec: null, empty: true }); continue; }
+    // A key or a cage just in front of the door on that side: taking this door means taking them too.
+    if (spec.key) props.spawn({ type: 'key', x }, z + 3.2);
+    if (spec.hostages) props.spawn({ type: 'cage', x, n: spec.hostages }, z + 4);
     const node = new THREE.Group();
     const panel = makeGatePanel(w, 2.1);
     panel.position.set(0, 1.25, 0);
@@ -524,6 +605,8 @@ function fireShot(t) {
 
 function gateLabel(gate, type) {
   const s = gate.spec;
+  if (!s) return { title: '', sub: '', tone: 'good' };
+  if (s.lock) return { title: s.chest ? t('chest') : opText(s), sub: '#lock', tone: 'lock' };
   if (type === 'weapon') return { title: s.label, sub: t(s.kind === 'rate' ? 'gate.rate' : 'gate.dmg'), tone: s.val > 0 ? 'gun' : 'bad' };
   if (s.op === 'x') return { title: `x${s.val}`, sub: '', tone: 'good' };
   if (s.op === '÷') return { title: `÷${s.val}`, sub: '', tone: 'bad' };
@@ -533,12 +616,16 @@ function gateLabel(gate, type) {
 }
 
 function drawGate(gate, type) {
+  if (!gate.panel) return;
   const l = gateLabel(gate, type);
   gate.panel.userData.draw(l.title, l.sub, l.tone);
 }
 
 // Firepower of the army right now (damage per second).
 const armyDps = () => game.count * game.rate * game.dmg;
+// Upgrades still help on hand-designed levels, but fixed enemies grow a little with them,
+// so the goals (beat the boss in 20 s...) stay worth planning for.
+const upgradeScale = () => Math.sqrt(damageMult(save.up.dmg) * rateMult(save.up.rate));
 
 function spawnSquad(ev, z) {
   const units = [];
@@ -548,11 +635,13 @@ function spawnSquad(ev, z) {
   // A runner pack is a share of a normal squad, faster and frailer.
   const share = ev.share || 1;
   const pressure = Math.min(0.55, 0.1 + L * 0.005) * (ev.ramp || 1) * share;
-  const strength = Math.max(Math.round(ev.count * share), Math.round(game.count * pressure), 1);
+  // Hand-designed levels use squads of a fixed size, so the plan you make in the preview holds.
+  const strength = ev.fixed ? Math.max(1, Math.round(ev.count)) : Math.max(Math.round(ev.count * share), Math.round(game.count * pressure), 1);
   const n = Math.min(strength, ENEMY.maxUnits);
   const w = Math.max(1, Math.round(strength / n)); // each figure stands for w enemies
   const ttk = (0.6 + L * 0.026) * (ev.fast ? 0.6 : 1); // seconds of full fire this squad should take
-  const unitHp = Math.max(1, Math.round(Math.max(ev.hp * w, Math.ceil((armyDps() * ttk * (ev.ramp || 1) * share) / n)) * enemyMult()));
+  const unitHp = ev.fixed ? Math.max(1, Math.round(ev.hp * w * upgradeScale() * enemyMult()))
+    : Math.max(1, Math.round(Math.max(ev.hp * w, Math.ceil((armyDps() * ttk * (ev.ramp || 1) * share) / n)) * enemyMult()));
   const medics = Math.min(ev.medics || 0, Math.floor(n / 6));
   const kinds = {};
   for (let i = 0; i < n; i++) {
@@ -586,7 +675,7 @@ function spawnSquad(ev, z) {
   squads.push({ x: clampX(ev.x, 1), z, units, alive: units.length, label, fast: !!ev.fast, kinds, tone, healIn: 1 });
   // A runner pack starts a little behind its squad and overtakes it.
   if (ev.runners) {
-    spawnSquad({ count: ev.count, hp: ev.hp, ramp: ev.ramp, x: -ev.x * 0.8, fast: true, share: 0.35 }, z - 6);
+    spawnSquad({ count: ev.count, hp: ev.hp, ramp: ev.ramp, x: -ev.x * 0.8, fast: true, share: 0.35, fixed: ev.fixed }, z - 6);
   }
 }
 
@@ -703,14 +792,90 @@ function spawnBoss(ev, z) {
   g.add(label);
   g.position.set(0, 0, z);
   scene.add(g);
-  // A boss should take a while even for a huge army.
-  const hp = Math.round(Math.max(ev.hp, armyDps() * (ev.week ? 2.4 : ev.big ? 1.6 : 1) * (4 + Math.min(10, game.level * 0.1))) * enemyMult());
+  // A boss should take a while even for a huge army. Hand-designed bosses have the health their level says.
+  const hp = ev.hand ? Math.round(ev.hp * upgradeScale() * enemyMult())
+    : Math.round(Math.max(ev.hp, armyDps() * (ev.week ? 2.4 * 0.8 : ev.big ? 1.6 : 1) * (4 + Math.min(10, game.level * 0.1))) * enemyMult());
   label.userData.set(hp, hp);
   boss = {
     x: 0, z, hp, max: hp, group: g, mat, armL, armR, label,
     contact: false, flash: 0, dead: false, slamIn: 0.5, introduced: false, big: !!ev.big, week: !!ev.week, enraged: false,
+    kind: ev.kind || 'brute', weak: !!ev.weak, hand: !!ev.hand, adds: ev.adds || 0, addHp: ev.addHp || 3,
+    limit: ev.limit || 55, fightT: 0, phase: 0, weakOpen: false, weakT: 2.2, swarmIn: 3,
+    scale: g.scale.x, hold: ev.weak || ev.hand ? -5.6 : null,
   };
+  if (boss.weak) addWeakPoint(g);
+  if (boss.kind === 'shield') {
+    boss.shieldMesh = new THREE.Mesh(new THREE.SphereGeometry(1.9, 24, 16), shieldMat);
+    boss.shieldMesh.position.y = 1.6;
+    g.add(boss.shieldMesh);
+    boss.shieldOn = true;
+  }
 }
+
+// ---------------------------------------------------------------- weak points
+// The weak point sits behind a plate. It opens for a moment, then closes; each health phase moves it
+// (chest, left shoulder, right shoulder) and calls in adds. A ring on the floor shows where to stand.
+const WEAK_SPOTS = [[0, 1.45, 0.8], [-0.86, 2.1, 0.42], [0.86, 2.1, 0.42]];
+const weakOrbMat = new THREE.MeshStandardMaterial({ color: 0xffe14d, emissive: 0xffb000, emissiveIntensity: 0.2, roughness: 0.3 });
+const weakPlateMat = new THREE.MeshStandardMaterial({ color: 0x8fa3c4, metalness: 0.7, roughness: 0.3 });
+const markerMat = new THREE.MeshBasicMaterial({ color: 0xffe14d, transparent: true, opacity: 0.6, depthWrite: false });
+function addWeakPoint(g) {
+  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 12), weakOrbMat);
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.66, 0.12), weakPlateMat);
+  g.add(orb, plate);
+  const marker = new THREE.Group();
+  const ring = new THREE.Mesh(ringGeo, markerMat);
+  ring.renderOrder = 1;
+  marker.add(ring);
+  marker.scale.setScalar(0.8);
+  scene.add(marker);
+  Object.assign(boss, { orb, plate, marker });
+  placeWeak();
+}
+function placeWeak() {
+  const [x, y, z] = WEAK_SPOTS[boss.phase % WEAK_SPOTS.length];
+  boss.orb.position.set(x, y, z);
+  boss.plate.position.set(x, y, z + 0.18);
+}
+function updateWeak(dt, active) {
+  if (!boss.weak || boss.dead) return;
+  const ph = boss.hp > boss.max * 0.66 ? 0 : boss.hp > boss.max * 0.33 ? 1 : 2;
+  if (ph > boss.phase) {
+    boss.phase = ph;
+    placeWeak();
+    boss.weakOpen = false;
+    boss.weakT = 1.4;
+    if (active) {
+      showBanner(t('boss.phase', { n: ph + 1 }));
+      sfx.roar();
+      game.shake = Math.max(game.shake, 0.45);
+      hitStop(0.08);
+      buzz([40, 30, 40]);
+      if (boss.adds) spawnSquad({ count: boss.adds, hp: boss.addHp, x: crowd.x, fixed: true }, boss.z + 2.5);
+    }
+  }
+  if (active) {
+    boss.weakT -= dt;
+    if (boss.weakT <= 0) {
+      boss.weakOpen = !boss.weakOpen;
+      boss.weakT = boss.weakOpen ? 2.6 : 3.2;
+      if (boss.weakOpen) {
+        sfx.key();
+        buzz(10);
+        if (!seen().tutWeak) placeTipSoon = 'weak';
+      }
+    }
+  }
+  const open = boss.weakOpen;
+  weakOrbMat.emissiveIntensity = open ? 1.1 + Math.sin(game.time * 14) * 0.4 : 0.15;
+  boss.plate.visible = !open;
+  boss.orb.scale.setScalar(open ? 1.15 + Math.sin(game.time * 14) * 0.08 : 0.9);
+  boss.weakX = boss.x + boss.orb.position.x * boss.scale;
+  boss.marker.visible = open && game.mode === 'playing';
+  boss.marker.position.set(boss.weakX, 0.04, -2.6); // just ahead of the squad, where it can be seen
+  markerMat.opacity = 0.45 + Math.abs(Math.sin(game.time * 8)) * 0.4;
+}
+let placeTipSoon = null;
 
 // Mega boss extras: a gold crown, shoulder spikes and a glowing visor.
 const visorMat = new THREE.MeshBasicMaterial({ color: 0xff3df2 });
@@ -763,7 +928,7 @@ function slamImpact(sl) {
   const units = crowd.units;
   let inside = 0;
   for (const u of units) {
-    const ux = clampX(crowd.x + u.ox);
+    const ux = unitX(u);
     if (Math.hypot(ux - sl.x, u.oz - sl.z) < sl.r) inside++;
   }
   if (!units.length || !inside) {
@@ -782,7 +947,8 @@ function slamImpact(sl) {
 // Up close the boss raises both arms, a red zone marks where the fists will land,
 // then it smashes. Step to the side to dodge.
 const punchReach = () => BOSS.punchReach * (boss.big ? 1.3 : 1);
-const punchWidth = () => BOSS.punchWidth * (boss.big ? 1.25 : 1);
+// Bosses with a weak point keep the narrow zone even when big: every telegraphed attack must be dodgeable.
+const punchWidth = () => BOSS.punchWidth * (boss.big && !boss.weak ? 1.25 : 1);
 
 function startPunch() {
   const reach = punchReach();
@@ -861,7 +1027,7 @@ function punchImpact(p) {
   const units = crowd.units;
   let inside = 0;
   for (const u of units) {
-    const ux = clampX(crowd.x + u.ox);
+    const ux = unitX(u);
     if (Math.abs(ux - p.x) < p.w / 2 && u.oz > z0 && u.oz < z1) inside++;
   }
   if (!units.length || !inside) {
@@ -886,6 +1052,7 @@ function trash(...objs) {
       postGeo, postMat, barrelGeo, barrelMat, bandGeo, bandMat, sawGeo, sawMat, sawHubMat, slotMat,
       turretBaseGeo, turretHeadGeo, turretBarrelGeo, turretMat, turretLightMat, shotGeo, shotMat,
       rockGeo, rockMat, ringGeo, ringFillGeo, iceMat, laneMat, shieldMat, unitBox, corpseGeo, energyMat, visorMat,
+      weakOrbMat, weakPlateMat, markerMat, ...PROP_SHARED,
     ]);
   }
   for (const obj of objs) {
@@ -969,7 +1136,7 @@ function updateCharge(dt, R) {
       c.hit = true;
       const half = boss.big ? 1.6 : 1.1;
       let inside = 0;
-      for (const u of crowd.units) if (Math.abs(clampX(crowd.x + u.ox) - c.x) < half) inside++;
+      for (const u of crowd.units) if (Math.abs(unitX(u) - c.x) < half) inside++;
       if (inside && crowd.units.length && game.mode === 'playing') {
         const loss = Math.max(1, Math.round(game.count * (inside / crowd.units.length) * 0.5));
         setCount(game.count - loss);
@@ -1024,7 +1191,7 @@ function summonMinions() {
 
 // Neon City: the boss raises a shield now and then; bullets bounce off it.
 function updateShield(dt) {
-  if (boss.week || themeFor(game.level).id !== 'night' || game.mode !== 'playing' || boss.z < -BOSS.slamRange) return;
+  if (boss.week || boss.kind === 'shield' || themeFor(game.level).id !== 'night' || game.mode !== 'playing' || boss.z < -BOSS.slamRange) return;
   if (!boss.shieldMesh) {
     boss.shieldMesh = new THREE.Mesh(new THREE.SphereGeometry(1.9, 24, 16), shieldMat);
     boss.shieldMesh.position.y = 1.6;
@@ -1063,7 +1230,16 @@ function clearLevel() {
   for (const p of gatePairs) trash(p.group);
   for (const s of squads) trash(s.label);
   for (const b of barrels) trash(b.group);
-  if (boss) trash(boss.group);
+  if (boss) trash(boss.group, boss.marker);
+  props.clear();
+  setLane(null);
+  if (game.preview) {
+    trash(game.preview.root);
+    game.preview = null;
+    $('preview').hidden = true;
+    scene.fog.far = 80;
+    scene.fog.near = 34;
+  }
   for (const sl of slams) trash(sl.group, sl.rock);
   slams = [];
   for (const sw of saws) trash(sw.group);
@@ -1089,12 +1265,13 @@ function clearLevel() {
 // ================================================================ flow
 function show(screen) {
   for (const s of [ui.home, ui.shop, ui.won, ui.lost, ui.pause]) s.hidden = s !== screen;
-  ui.hud.hidden = !['playing', 'bonus', 'paused', 'won', 'lost'].includes(game.mode) || screen === ui.won || screen === ui.lost;
+  ui.hud.hidden = !['playing', 'bonus', 'paused', 'won', 'lost', 'shop'].includes(game.mode) || screen === ui.won || screen === ui.lost;
 }
 
 function refreshWallet() {
   for (const el of ui.wallet) el.textContent = fmt(save.coins);
   ui.playLabel.textContent = t('play', { n: save.level });
+  $('levels-label').textContent = `★ ${totalStars()}`;
   $('home-world').textContent = t('world.label', { n: worldNumber(save.level), name: t(`world.${themeFor(save.level).id}`) });
   if (bossWeek) bossWeek.render();
   const kindTag = levelKind(save.level);
@@ -1107,35 +1284,59 @@ function refreshWallet() {
 }
 
 // event: null for the next level, 'bossweek' for the weekly mega boss (it does not move you a level on).
-function startLevel(event = null) {
+// replay: a level number below the current one, played again for stars (does not move you on).
+function startLevel(event = null, replay = null) {
   if (typeof event !== 'string') event = null; // also used directly as a click handler
+  if (typeof replay !== 'number' || replay >= save.level || replay < 1) replay = null;
   unlockAudio();
   sfx.tap();
+  $('screen-runshop').hidden = true;
   clearLevel();
   game.event = event;
-  game.level = save.level;
+  game.level = event ? save.level : replay || save.level;
+  game.replay = !!replay;
   game.plan = event === 'bossweek' ? buildBossWeekLevel(game.level) : buildLevel(game.level);
   Object.assign(game, {
     mode: 'playing', nextEvent: 0, tipKind: null, traveled: 0, speed: RUN.speed, coinsRun: 0, emitAcc: 0,
     crushAcc: 0, shake: 0, endTimer: 0, time: 0, peak: 0, revived: false, lastEarned: 0,
-    dmg: GUN.baseDamage * damageMult(save.up.dmg),
-    rate: GUN.baseRate * rateMult(save.up.rate),
+    buffRate: 1, buffDmg: 1, keys: 0, hostages: 0, hostagesMissed: 0, lost: 0, targets: 0, targetsMissed: 0,
+    chests: 0, chestMissed: false, bossSecs: 0, runTime: 0, cine: null, inFork: false, mud: 1, result: null,
+    shopPick: null, shapeUsed: false, cheer: 0, hitstop: 0, lossAcc: 0, lossPopT: 0,
   });
   game.weapon = weaponById(save.weapon);
-  game.dmg *= game.weapon.dmg;
-  game.rate *= game.weapon.rate;
+  recalcGun();
   applyLoadout();
   crowd.units.length = 0;
   crowd.x = crowd.target = 0;
-  setCount(startSoldiers(save.up.army));
+  setShape('normal', true);
+  // Hand-designed levels start with the squad their puzzle needs; the army upgrade joins as
+  // reinforcements when the boss shows up, so the door arithmetic stays the same for everyone.
+  const hand = !!game.plan.hand;
+  const army = startSoldiers(save.up.army);
+  setCount(hand ? game.plan.start : army, true);
+  game.reinforce = hand ? army - 1 : 0;
+  game.hostagesTotal = game.plan.events.reduce((n, e) => n + (e.type === 'cage' ? e.n : 0)
+    + (e.type === 'gates' ? ((e.left && e.left.hostages) || 0) + ((e.right && e.right.hostages) || 0) : 0), 0);
   ui.level.textContent = event ? t('bw.title') : levelTitle(game.level);
-  const theme = applyWorld(game.level);
+  applyWorld(game.level);
   game.finishAt = 0;
   ui.runCoins.textContent = '0';
   game.dragged = 0;
   game.tutTimer = 0;
+  track('level_start', {
+    level: game.level, weapon: save.weapon, skin: save.skin, replay: game.replay ? 1 : 0,
+    army: save.up.army, dmg: save.up.dmg, rate: save.up.rate, income: save.up.income, event: event || '',
+  });
+  requestWakeLock();
+  startPreview();
+}
+
+// After the preview: the run itself starts.
+function beginRun() {
+  const event = game.event;
+  const theme = themeFor(game.level);
   // Returning players on the first levels get the short reminder; new players get the full guide.
-  $('hint-text').textContent = t('hint');
+  $('hint-text').textContent = t(game.plan.hand ? 'hint.plan' : 'hint');
   ui.hint.hidden = game.level > 2 || !seen().tutDrag;
   ui.hint.classList.remove('fade');
   if (!ui.hint.hidden) setTimeout(() => ui.hint.classList.add('fade'), 2600);
@@ -1146,12 +1347,9 @@ function startLevel(event = null) {
   else if (seen().tutDrag) showBanner(pick(t('taunts')).replace('{n}', game.level)); // not on a brand-new player's first look
   startMusic();
   setMusicIntensity(1);
-  track('level_start', {
-    level: game.level, weapon: save.weapon, skin: save.skin,
-    army: save.up.army, dmg: save.up.dmg, rate: save.up.rate, income: save.up.income, event: event || '',
-  });
   show(null);
-  requestWakeLock();
+  refreshPuzzleHud();
+  if (shapeUnlocked() && !seen().tutShape && game.plan.events.some((e) => e.type === 'wall' || e.type === 'bridge')) $('shape-ctl').classList.add('teach');
 }
 
 function showBanner(text) {
@@ -1169,19 +1367,29 @@ function winLevel(mult = 1) {
   sfx.win();
   buzz([20, 40, 20]);
   const base = 20 + game.level * 6 + game.coinsRun;
-  const earned = Math.round(base * incomeMult(save.up.income) * mult * remote.num('coin_mult', 1, 0.2, 5));
+  const r = finishRun(true);
+  // Stars add a little to the pay-out; a replay pays half.
+  const earned = Math.round(base * (1 + r.stars * 0.15) * (game.replay ? 0.5 : 1) * incomeMult(save.up.income) * mult * remote.num('coin_mult', 1, 0.2, 5));
   const ev = game.event;
   save.coins += earned;
   if (!ev) {
+    save.stars = save.stars || {};
+    const before = save.stars[game.level] || 0;
+    save.stars[game.level] = Math.max(before, r.stars);
+    game.newBest = r.stars > before;
+  }
+  if (!ev && !game.replay) {
     save.level += 1;
     leaderboard.submit('level', save.level - 1);
   }
+  renderGoals($('won-goals'), game.plan.goals, r);
+  $('won-stars').setAttribute('aria-label', t('stars.n', { n: r.stars }));
   lastShare = { title: ev ? t('bw.won') : t('sh.win', { n: game.level }), line: t('sh.dare') };
   lastWinBig = mult >= 3;
   game.lastEarned = earned;
   game.shownBonus = 0;
   game.tripled = false;
-  if (!ev && save.level === 4) setTimeout(maybeOffer, 1800);
+  if (!ev && !game.replay && save.level === 4) setTimeout(maybeOffer, 1800);
   wonExtras(ev);
   afterRun();
   mission('win');
@@ -1193,7 +1401,7 @@ function winLevel(mult = 1) {
   record('passTier', meta.currentTier());
   $('won-xp').textContent = t('pass.xp', { n: xp.gain });
   if (xp.tierUp) setTimeout(() => popup(t('pass.tierUp'), 'gun'), 1300);
-  track('level_complete', { level: game.level, mult, coins: earned, seconds: Math.round(game.time), peak: Math.round(game.peak || 0), event: ev || '' });
+  track('level_complete', { level: game.level, mult, coins: earned, seconds: Math.round(game.time), peak: Math.round(game.peak || 0), event: ev || '', stars: r.stars, goals: r.goals.map((g) => (g ? 1 : 0)).join(''), lost: r.lost, replay: game.replay ? 1 : 0, shop: game.shopPick || '', shape: game.shapeUsed ? 1 : 0 });
   ui.adTriple.hidden = false;
   ui.adTriple.disabled = false;
   ui.wonMult.hidden = mult <= 1;
@@ -1235,6 +1443,10 @@ function loseLevel(reason) {
   sfx.lose();
   buzz([60, 40, 60]);
   ui.lostLine.textContent = t(reason);
+  $('screen-runshop').hidden = true;
+  if (game.cine) { game.cine = null; $('cine').hidden = true; }
+  const r = finishRun(false);
+  renderGoals($('lost-goals'), game.plan ? game.plan.goals : [], r);
   track(game.event === 'bossweek' ? 'boss_week_fail' : 'level_fail', {
     level: game.level, reason, seconds: Math.round(game.time),
     progress: game.plan ? Math.min(1, game.traveled / game.plan.length) : 0, peak: Math.round(game.peak || 0),
@@ -1294,6 +1506,7 @@ async function revive() {
   game.revived = true;
   game.mode = 'playing';
   game.endTimer = 0;
+  game.result = null;
   // Clear whatever just beat you so the second chance is real.
   squads = squads.filter((sq) => {
     if (sq.z > -12) {
@@ -1661,6 +1874,11 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = true;
   if (e.key === 'ArrowRight' || e.key === 'd') keys.right = true;
   if ((e.key === ' ' || e.key === 'Enter') && game.mode === 'home') startLevel();
+  else if ((e.key === ' ' || e.key === 'Enter') && game.mode === 'preview') endPreview();
+  if (game.mode === 'playing' && shapeUnlocked()) {
+    if (e.key === 'ArrowUp' || e.key === 'w') setShape('squeeze');
+    if (e.key === 'ArrowDown' || e.key === 's') setShape('spread');
+  }
   if (e.key === 'Escape') game.mode === 'paused' ? resumeGame() : pauseGame();
 });
 window.addEventListener('keyup', (e) => {
@@ -1775,6 +1993,434 @@ function toast(text) {
   toastTimer = setTimeout(() => { el.hidden = true; }, 3400);
 }
 
+// ================================================================ puzzle layer
+// Props on the track (props.js) report back here; the squad and the score live in main.js.
+const props = createProps({
+  scene, game, crowd, t, trash, sfx, slotMat, sawGeo, sawMat,
+  radius: () => crowdRadius(), unitX, killUnits, seeObstacle, popAt, setLane, loseLevel: (r) => loseLevel(r),
+  onTarget(ok, p) {
+    if (ok) {
+      popAt(t('tgt.hit'), 0, 3, p.z, 'good', 1.3);
+      sfx.target();
+      burst(0, 2.2, p.z, 30, [sparkMats.fire[0], sparkMats.fire[2], sparkMats.heal], 6, [0.08, 0.2]);
+      ringWave(crowd.x, p.z, 0x2bd47a, 2.4);
+      hitStop(0.05);
+      buzz([15, 25, 15]);
+    } else {
+      popAt(t('tgt.miss'), 0, 3, p.z, 'bad', 1.2);
+      sfx.miss();
+      buzz(60);
+      game.shake = Math.max(game.shake, 0.25);
+    }
+    track('target', { level: game.level, ok, count: Math.round(game.count) });
+  },
+  onSwitch(ok, reward, p) {
+    if (!ok) {
+      popAt(t('sw.miss'), 0, 2, p.z, 'bad');
+      sfx.gateBad();
+      return;
+    }
+    const before = game.count;
+    setCount(Math.round(applyOpCount(game.count, reward)));
+    popAt(`+${fmt(game.count - before)}`, 0, 2.4, p.z, 'good', 1.3);
+    ringWave(0, p.z, 0x2bd47a, 2.2);
+    burst(0, 1.2, p.z, 26, [sparkMats.ally, sparkMats.fire[2], sparkMats.heal], 5);
+    sfx.gateMul(reward.val || 2);
+    hitStop(0.05);
+    buzz([12, 20, 12]);
+  },
+  onRescue(n, p) {
+    setCount(game.count + n);
+    game.hostages += n;
+    popAt(t('hostage.saved', { n }), p.x, 2, p.z, 'good', 1.15);
+    burst(p.x, 1, p.z, 18, [sparkMats.heal, sparkMats.fire[2]], 4);
+    ringWave(p.x, p.z, 0x2bd47a);
+    sfx.rescue();
+    buzz([15, 20, 15]);
+  },
+  onKey(p) {
+    game.keys++;
+    popAt(t('key.got'), p.x, 2, p.z, 'gun');
+    burst(p.x, 1, p.z, 16, [sparkMats.fire[0], sparkMats.fire[2]], 4);
+    sfx.key();
+    buzz(20);
+    refreshPuzzleHud();
+  },
+  openShop: (ev) => openRunShop(ev),
+  bridgeFail(reason) {
+    sfx.creak();
+    sfx.bigBoom();
+    game.shake = 0.6;
+    hitStop(0.12);
+    buzz([80, 40, 80]);
+    killUnits(() => true, 'fall', reason);
+  },
+  bridgeOk(p) {
+    sfx.creak();
+    popAt(t('bridge.ok'), 0, 1.8, p.z, 'good');
+  },
+});
+const applyOpCount = (n, spec) => (spec.op === 'x' ? n * spec.val : spec.op === '÷' ? Math.ceil(n / spec.val) : n + spec.val);
+
+// Numbers that pop up where things happen in the world, then rise and fade.
+const popVec = new THREE.Vector3();
+function popAt(text, x, y, z, kind = '', size = 1) {
+  popVec.set(x, y, z).project(camera);
+  if (popVec.z > 1) return;
+  const el = document.createElement('div');
+  el.className = `popat ${kind}`;
+  el.textContent = text;
+  el.style.left = `${((popVec.x + 1) / 2) * window.innerWidth}px`;
+  el.style.top = `${((1 - popVec.y) / 2) * window.innerHeight}px`;
+  if (size !== 1) el.style.fontSize = `${Math.round(30 * size)}px`;
+  const host = $('popats');
+  while (host.childElementCount > 7) host.firstElementChild.remove();
+  host.appendChild(el);
+  setTimeout(() => el.remove(), 1100);
+}
+
+// A ring that spreads over the floor when a door is passed.
+const waves = [];
+function ringWave(x, z, color, size = 1.6) {
+  if (waves.length > 6) return;
+  const m = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8, depthWrite: false }));
+  m.position.set(x, 0.05, z);
+  m.renderOrder = 1;
+  scene.add(m);
+  waves.push({ m, t: 0, size });
+}
+// The door's sign does not just vanish: it pops up and fades.
+const fading = [];
+function shatterPanel(gate) {
+  if (!gate.panel) return;
+  gate.panel.visible = true;
+  gate.panel.material.opacity = 1;
+  fading.push({ mesh: gate.panel, t: 0 });
+}
+function updateFx(dt, dz) {
+  for (let i = waves.length - 1; i >= 0; i--) {
+    const w = waves[i];
+    w.t += dt;
+    w.m.position.z += dz;
+    w.m.scale.setScalar(0.4 + w.t * 5 * w.size);
+    w.m.material.opacity = Math.max(0, 0.8 - w.t * 1.6);
+    if (w.t > 0.5) { trash(w.m); waves.splice(i, 1); }
+  }
+  for (let i = fading.length - 1; i >= 0; i--) {
+    const f = fading[i];
+    f.t += dt;
+    f.mesh.scale.setScalar(1 + f.t * 2.2);
+    f.mesh.position.y = 1.25 + f.t * 3;
+    f.mesh.material.opacity = Math.max(0, 1 - f.t / 0.28);
+    if (f.t > 0.28) { f.mesh.visible = false; fading.splice(i, 1); }
+  }
+}
+function hitStop(s) {
+  game.hitstop = Math.max(game.hitstop || 0, s);
+}
+
+// Win: confetti over the screen and the squad jumps for joy.
+function celebrate() {
+  game.cheer = 2.2;
+  const host = $('confetti');
+  host.innerHTML = '';
+  const colors = ['#2f7cf6', '#ffbe2e', '#e8453c', '#2bd47a', '#8a78f0', '#ff9628'];
+  const n = fx.cheap ? 24 : 44;
+  for (let i = 0; i < n; i++) {
+    const c = document.createElement('i');
+    c.style.left = `${Math.random() * 100}%`;
+    c.style.background = colors[i % colors.length];
+    c.style.animationDelay = `${Math.random() * 0.5}s`;
+    c.style.animationDuration = `${1.6 + Math.random() * 1.2}s`;
+    c.style.setProperty('--dx', `${(Math.random() * 2 - 1) * 80}px`);
+    c.style.setProperty('--r', `${Math.random() * 720 - 360}deg`);
+    host.appendChild(c);
+  }
+  host.hidden = false;
+  setTimeout(() => { host.hidden = true; host.innerHTML = ''; }, 3200);
+  buzz([20, 40, 20, 40, 60]);
+}
+
+// ---------------------------------------------------------------- boss intro
+function startCine() {
+  if (!boss) return;
+  game.cine = { t: 0, dur: 2.5 };
+  const kind = boss.week ? 'week' : boss.kind;
+  $('cine-name').textContent = t(`boss.name.${kind}`);
+  $('cine-kicker').textContent = boss.big || boss.week ? t('boss.kicker.world') : t('boss.kicker');
+  const hints = [];
+  if (boss.weak) hints.push(t('boss.hint.weak'));
+  if (boss.kind === 'shield') hints.push(t('boss.hint.shield'));
+  if (boss.kind === 'swarm') hints.push(t('boss.hint.swarm'));
+  if (!hints.length) hints.push(t('boss.hint.brute'));
+  $('cine-hint').textContent = hints.join(' ');
+  $('cine').hidden = false;
+  $('cine').classList.remove('go');
+  void $('cine').offsetWidth;
+  $('cine').classList.add('go');
+  ui.banner.hidden = true;
+  track('boss_intro', { level: game.level, kind });
+}
+function updateCine(dt) {
+  game.cine.t += dt;
+  if (game.cine.t >= game.cine.dur) endCine();
+}
+function endCine() {
+  if (!game.cine) return;
+  game.cine = null;
+  $('cine').hidden = true;
+  if (game.reinforce > 0 && game.mode === 'playing') {
+    setCount(game.count + game.reinforce);
+    popup(t('reinforce', { n: game.reinforce }), 'good');
+    game.reinforce = 0;
+  }
+}
+$('cine').addEventListener('pointerdown', () => { if (game.cine && game.cine.t > 0.4) game.cine.t = Math.max(game.cine.t, game.cine.dur - 0.45); });
+
+// ---------------------------------------------------------------- overhead preview
+// Before the run the camera flies high over the whole track, laid out as a map,
+// with the level's goals on screen. Tap to skip.
+function startPreview() {
+  game.mode = 'preview';
+  const root = props.buildPreview(game.plan.events);
+  scene.add(root);
+  const len = game.plan.length;
+  game.preview = { root, t: 0, dur: Math.max(2.6, Math.min(5.2, len / 75)), len, travel: 0 };
+  renderGoals($('pv-goals'), game.plan.goals, null);
+  $('pv-title').textContent = ui.level.textContent;
+  const idea = game.plan.idea && game.plan.idea !== 'mix' && !game.event ? t(`idea.${game.plan.idea}`) : '';
+  $('pv-idea').textContent = idea;
+  $('pv-idea').hidden = !idea;
+  $('preview').hidden = false;
+  show(null);
+  ui.hud.hidden = true;
+  scene.fog.far = 170;
+  scene.fog.near = 60;
+}
+function updatePreview(dt) {
+  const p = game.preview;
+  if (!p) return;
+  p.t += dt;
+  const k = Math.min(1, p.t / p.dur);
+  const e = k * k * (3 - 2 * k);
+  const travel = e * Math.max(0, p.len - 22);
+  const dz = travel - p.travel;
+  p.travel = travel;
+  p.root.position.z = travel;
+  trackTex.offset.y += dz / 4;
+  for (const m of decor.active) m.position.z += dz * 0.9;
+  drawCrowd(dt);
+  // High and steep, so the doors read like a map; tall screens see further down the track.
+  const sway = Math.sin(p.t * 0.8) * 0.5;
+  const tall = Math.min(1.3, Math.max(0.8, 1 / camera.aspect / 1.7));
+  camera.position.set(sway, 25 * tall, 4);
+  lookAt.set(0, 0, -20 * tall);
+  camera.lookAt(lookAt);
+  if (p.t > p.dur + 1.6) endPreview();
+}
+function endPreview() {
+  if (!game.preview) return;
+  trash(game.preview.root);
+  game.preview = null;
+  $('preview').hidden = true;
+  scene.fog.far = 80;
+  scene.fog.near = 34;
+  game.mode = 'playing';
+  show(null);
+  beginRun();
+}
+$('preview').addEventListener('pointerdown', () => {
+  if (!game.preview) return;
+  sfx.tap();
+  track('preview_skip', { level: game.level, at: Math.round(game.preview.t * 10) / 10 });
+  endPreview();
+});
+
+// ---------------------------------------------------------------- mid-run shop
+// Trade soldiers for a weapon (this run only) or an upgrade. The world waits while you choose.
+function bossOfPlan() {
+  return game.plan.events.find((e) => e.type === 'boss') || {};
+}
+function openRunShop(ev) {
+  game.mode = 'shop';
+  drag.active = false;
+  const list = $('rs-list');
+  list.innerHTML = '';
+  const b = bossOfPlan();
+  $('rs-boss').textContent = t(`rs.boss.${b.kind || 'brute'}`);
+  ev.offers.forEach((o, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'rs-offer';
+    btn.id = `rs-offer-${i}`;
+    const weapon = !['rate', 'dmg'].includes(o.id);
+    const name = weapon ? t(`gun.${o.id}`) : t(`rs.${o.id}`, { n: Math.round(o.val * 100) });
+    const desc = weapon ? `${t(`gun.${o.id}.desc`)} ${t('rs.thisRun')}` : t(`rs.${o.id}.desc`);
+    const icon = weapon ? `<span class="weapon-icon w-${o.id}" aria-hidden="true"></span>` : `<span class="rs-up" aria-hidden="true">${o.id === 'rate' ? '»' : '✦'}</span>`;
+    btn.innerHTML = `${icon}<span class="rs-text"><b>${name}</b><small>${desc}</small></span><span class="rs-cost">${t('rs.cost', { n: o.cost })}</span>`;
+    btn.disabled = game.count <= o.cost || (weapon && game.weapon.id === o.id);
+    btn.addEventListener('click', () => buyRunOffer(o));
+    list.appendChild(btn);
+  });
+  $('rs-have').textContent = t('rs.have', { n: fmt(game.count) });
+  $('screen-runshop').hidden = false;
+  sfx.buy();
+  buzz(15);
+  track('run_shop_open', { level: game.level });
+}
+function closeRunShop() {
+  $('screen-runshop').hidden = true;
+  if (game.mode === 'shop') game.mode = 'playing';
+}
+function buyRunOffer(o) {
+  if (game.count <= o.cost) return;
+  setCount(game.count - o.cost, true);
+  if (o.id === 'rate') game.buffRate *= 1 + o.val;
+  else if (o.id === 'dmg') game.buffDmg *= 1 + o.val;
+  else game.weapon = weaponById(o.id);
+  recalcGun();
+  applyLoadout(game.weapon);
+  sfx.buy();
+  buzz([15, 20, 15]);
+  popup(t('rs.bought', { n: o.cost }), 'gun');
+  game.shopPick = o.id;
+  track('run_shop_buy', { level: game.level, id: o.id, cost: o.cost });
+  closeRunShop();
+}
+$('btn-rs-skip').addEventListener('click', () => { sfx.tap(); game.shopPick = 'skip'; track('run_shop_buy', { level: game.level, id: 'skip', cost: 0 }); closeRunShop(); });
+
+function recalcGun() {
+  const w = game.weapon || WEAPONS[0];
+  game.rate = GUN.baseRate * rateMult(save.up.rate) * w.rate * (game.buffRate || 1);
+  game.dmg = GUN.baseDamage * damageMult(save.up.dmg) * w.dmg * (game.buffDmg || 1);
+}
+
+// ---------------------------------------------------------------- goals and stars
+function goalText(g) {
+  return t(`goal.${g.g}`, { n: g.n, s: g.s });
+}
+function runResult(won) {
+  return {
+    won, final: Math.round(game.count), lost: Math.round(game.lost), targets: game.targets, targetsMissed: game.targetsMissed,
+    hostages: game.hostages, hostagesTotal: game.hostagesTotal, chests: game.chests, bossSecs: game.bossSecs || Infinity, time: game.runTime,
+  };
+}
+// Called once per run: when the boss falls (won) or when the squad is gone (lost).
+function finishRun(won) {
+  if (game.result) return game.result;
+  const r = runResult(won);
+  r.goals = (game.plan.goals || []).map((g) => goalMet(g, r));
+  r.stars = won ? r.goals.filter(Boolean).length : 0;
+  game.result = r;
+  return r;
+}
+// Is a goal still possible right now? (for the stars in the HUD)
+function goalAlive(g) {
+  switch (g.g) {
+    case 'loss': return game.lost <= g.n;
+    case 'targets': return game.targetsMissed === 0;
+    case 'hostages': return game.hostagesMissed === 0;
+    case 'boss': return !(boss && boss.introduced && boss.fightT > g.s);
+    case 'time': return game.runTime <= g.s;
+    case 'chest': return !game.chestMissed;
+    default: return true;
+  }
+}
+function renderGoals(el, goals, result) {
+  el.innerHTML = '';
+  (goals || []).forEach((g, i) => {
+    const li = document.createElement('li');
+    const state = !result ? 'todo' : result.goals[i] ? 'ok' : 'no';
+    li.className = `goal ${state}`;
+    li.innerHTML = `<span class="goal-star" aria-hidden="true"></span><span class="goal-text"></span><span class="goal-mark" aria-hidden="true">${state === 'ok' ? '✓' : state === 'no' ? '✕' : ''}</span>`;
+    li.querySelector('.goal-text').textContent = goalText(g);
+    if (result) li.setAttribute('aria-label', `${goalText(g)}: ${t(state === 'ok' ? 'goal.done' : 'goal.missed')}`);
+    el.appendChild(li);
+  });
+}
+function revealStars(n) {
+  const stars = [...document.querySelectorAll('#won-stars .star')];
+  stars.forEach((st) => st.classList.remove('on'));
+  stars.forEach((st, i) => {
+    if (i >= n) return;
+    setTimeout(() => { st.classList.add('on'); sfx.star(i); buzz(18); }, 350 + i * 330);
+  });
+}
+
+// HUD: keys in hand, the next target, the boss clock and the three goal stars.
+function refreshPuzzleHud() {
+  const plan = game.plan;
+  const active = (game.mode === 'playing' || game.mode === 'shop') && plan;
+  $('hud-keys').hidden = !active || game.keys <= 0;
+  $('hud-keys-n').textContent = `×${game.keys}`;
+  const next = active && props.list().find((p) => p.type === 'check' && !p.passed);
+  const tg = $('hud-target');
+  tg.hidden = !next || next.z < -60;
+  if (next) {
+    const n = Math.round(game.count);
+    const ok = n >= next.ev.min && n <= (next.ev.max ?? Infinity);
+    tg.className = `chip chip-target ${ok ? 'ok' : n < next.ev.min ? 'low' : 'high'}`;
+    $('hud-target-text').textContent = t('tgt.chip', { t: next.ev.max === null ? `≥${next.ev.min}` : next.ev.min === next.ev.max ? `=${next.ev.min}` : `${next.ev.min}–${next.ev.max}`, n });
+  }
+  const bg = plan && plan.goals && plan.goals.find((g) => g.g === 'boss');
+  const clock = $('hud-clock');
+  clock.hidden = !active || !bg || !boss || !boss.introduced || boss.dead;
+  if (!clock.hidden) {
+    clock.textContent = t('boss.clock', { s: boss.fightT.toFixed(1), max: bg.s });
+    clock.classList.toggle('late', boss.fightT > bg.s);
+  }
+  const stars = $('hud-goals');
+  stars.hidden = !active || !plan.goals;
+  if (!stars.hidden) {
+    const html = plan.goals.map((g) => `<i class="${goalAlive(g) ? '' : 'off'}"></i>`).join('');
+    if (stars.dataset.html !== html) { stars.innerHTML = html; stars.dataset.html = html; }
+  }
+  $('shape-ctl').hidden = !(game.mode === 'playing' && shapeUnlocked()) || game.cine;
+}
+const shapeUnlocked = () => game.level >= 2 || save.level > 2 || !!game.event;
+
+// ---------------------------------------------------------------- level map
+// Every level played so far, with its stars. Old saves: cleared levels show a tick until replayed.
+function starsOf(n) {
+  return (save.stars && save.stars[n]) || 0;
+}
+function totalStars() {
+  return Object.values(save.stars || {}).reduce((a, b) => a + b, 0);
+}
+function openLevels() {
+  const grid = $('levels-grid');
+  grid.innerHTML = '';
+  const last = Math.max(save.level + 2, Math.min(HAND_LEVELS, 10));
+  for (let n = 1; n <= last; n++) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'lv-cell';
+    const open = n <= save.level;
+    const st = starsOf(n);
+    const legacy = open && n < save.level && !(save.stars && n in save.stars);
+    b.disabled = !open;
+    if (n === save.level) b.classList.add('next');
+    if (levelKind(n) === 'boss') b.classList.add('boss');
+    b.innerHTML = `<b>${n}</b><span class="lv-stars">${open && n < save.level ? (legacy ? '<em>✓</em>' : [0, 1, 2].map((i) => `<i class="${i < st ? 'on' : ''}"></i>`).join('')) : ''}</span>`;
+    b.setAttribute('aria-label', t('lv.cell', { n, s: st }));
+    b.addEventListener('click', () => {
+      sfx.tap();
+      $('screen-levels').hidden = true;
+      startLevel(null, n);
+    });
+    grid.appendChild(b);
+  }
+  $('levels-total').textContent = t('lv.total', { n: totalStars(), max: Math.min(save.level - 1, 9999) * 3 });
+  $('screen-levels').hidden = false;
+}
+$('btn-levels').addEventListener('click', () => { unlockAudio(); sfx.tap(); openLevels(); });
+$('btn-levels-close').addEventListener('click', () => { sfx.tap(); $('screen-levels').hidden = true; });
+
+// ---------------------------------------------------------------- shape control
+for (const b of document.querySelectorAll('[data-shape]')) {
+  b.addEventListener('click', () => { unlockAudio(); setShape(b.dataset.shape); markSeen('tutShape'); $('shape-ctl').classList.remove('teach'); });
+}
+
 // ================================================================ resize
 let camAim = 0;
 function resize() {
@@ -1852,7 +2498,7 @@ function updateTutorial(dt) {
   if (!s.tutDoor && game.mode === 'playing') {
     const p = gatePairs.find((q) => !q.passed && q.kind === 'gates' && !q.moving && q.z > -18);
     if (p) {
-      const score = (g) => (g.spec.op === 'x' ? game.count * g.spec.val : g.spec.op === '÷' ? game.count / g.spec.val : game.count + g.value);
+      const score = (g) => (!g.spec ? game.count : g.spec.op === 'x' ? game.count * g.spec.val : g.spec.op === '÷' ? game.count / g.spec.val : game.count + g.value);
       const best = score(p.gates[0]) >= score(p.gates[1]) ? p.gates[0] : p.gates[1];
       placeTip(t('tut.door'), best.x, 2.7, p.z);
       if (p.z > -12) game.tutScale = 0.45;
@@ -1864,9 +2510,9 @@ function updateTutorial(dt) {
   // 3. Shoot a red door to flip it.
   if (!s.tutShoot && game.mode === 'playing') {
     const p = gatePairs.find((q) => !q.passed && q.kind === 'gates' && !q.moving && q.z > -20 && q.z < -6
-      && q.gates.some((g) => g.spec.op === '+' && g.value < 0));
+      && !(game.plan && game.plan.hand) && q.gates.some((g) => g.spec && g.spec.op === '+' && g.value < 0));
     if (p) {
-      const g = p.gates.find((x) => x.spec.op === '+' && x.value < 0);
+      const g = p.gates.find((x) => x.spec && x.spec.op === '+' && x.value < 0);
       placeTip(t('tut.shoot'), g.x, 2.7, p.z);
       game.tutScale = 0.5;
       game.tutTimer = (game.tutTimer || 0) + dt;
@@ -1910,6 +2556,43 @@ function updateTutorial(dt) {
     }
   }
 
+  // 4c. Puzzle pieces, the first time each one comes up: a tip next to it, with the game slowed down.
+  if (game.mode === 'playing' && game.plan && game.plan.hand) {
+    for (const p of props.list()) {
+      const kind = p.type === 'wall' ? p.kind : p.type;
+      const tip = PUZZLE_TIPS[kind];
+      if (!tip || p.z < -21 || p.z > -6) continue;
+      const key = `tip_${kind}`;
+      if (s[key] && game.tipKind !== key) continue;
+      if (!s[key]) { markSeen(key); game.tipKind = key; game.tutTimer = 0; }
+      const x = p.type === 'cage' || p.type === 'key' ? p.x : p.type === 'bridge' ? 0 : 0;
+      placeTip(t(tip), x, p.type === 'check' ? 3.6 : 2.2, p.z);
+      if (tip === 'tut.squeeze' || tip === 'tut.bridge') $('shape-ctl').classList.add('teach');
+      game.tutScale = 0.4;
+      game.tutTimer = (game.tutTimer || 0) + dt;
+      if (game.tutTimer > 1.7) { game.tipKind = null; game.tutTimer = 0; }
+      return;
+    }
+    const lockPair = gatePairs.find((q) => !q.passed && q.z > -20 && q.z < -7 && q.gates.some((g) => g.spec && g.spec.lock));
+    if (lockPair && (!s.tip_lock || game.tipKind === 'tip_lock')) {
+      if (!s.tip_lock) { markSeen('tip_lock'); game.tipKind = 'tip_lock'; game.tutTimer = 0; }
+      const g = lockPair.gates.find((q) => q.spec && q.spec.lock);
+      placeTip(t('tut.lock'), g.x, 2.8, lockPair.z);
+      game.tutScale = 0.4;
+      game.tutTimer = (game.tutTimer || 0) + dt;
+      if (game.tutTimer > 1.7) { game.tipKind = null; game.tutTimer = 0; }
+      return;
+    }
+  }
+  // 4d. The first time a weak point opens.
+  if (placeTipSoon === 'weak' && boss && boss.weakOpen && game.mode === 'playing') {
+    placeTip(t('tut.weak'), boss.weakX, 0.4, -0.6);
+    game.tutScale = 0.45;
+    game.tutTimer = (game.tutTimer || 0) + dt;
+    if (game.tutTimer > 1.6) { markSeen('tutWeak'); placeTipSoon = null; game.tutTimer = 0; }
+    return;
+  }
+
   // 5. Boss attacks: step out of the red circle.
   if (!s.tutBoss && game.mode === 'playing' && slams.length) {
     const sl = slams[0];
@@ -1939,6 +2622,11 @@ function updateTutorial(dt) {
   el.hidden = true;
 }
 
+const PUZZLE_TIPS = {
+  door: 'tut.squeeze', saws: 'tut.saws', pit: 'tut.pit', log: 'tut.log', bridge: 'tut.bridge', check: 'tut.target',
+  key: 'tut.key', fork: 'tut.fork', cage: 'tut.hostage', switch: 'tut.switch', mud: 'tut.mud',
+};
+
 // After the first win, point at the shop once.
 function homeTip() {
   if (seen().tutShop || save.level < 2 || anyModalOpen()) return;
@@ -1965,18 +2653,52 @@ function applyGate(pair) {
   }
   const gate = pair.moving ? pair.gates[0] : crowd.x < 0 ? pair.gates[0] : pair.gates[1];
   const other = pair.moving ? pair.gates[0] : crowd.x < 0 ? pair.gates[1] : pair.gates[0];
-  other.panel.visible = false;
+  if (other.panel) other.panel.visible = false;
+  if (other !== gate && other.spec && other.spec.chest) game.chestMissed = true;
+  if (!gate.spec) return; // the empty side
+  const s = gate.spec;
+  if (s.lock) {
+    // Locked: a key opens it (and is used up); without one the squad bounces off and nothing happens.
+    if (game.keys <= 0) {
+      if (s.chest) game.chestMissed = true;
+      popAt(t('gate.locked'), gate.x, 2, pair.z, 'bad');
+      sfx.locked();
+      buzz(40);
+      game.shake = Math.max(game.shake, 0.2);
+      burst(gate.x, 1.3, pair.z, 10, [sparkMats.barrel, sparkMats.fire[2]], 3);
+      return;
+    }
+    game.keys--;
+    refreshPuzzleHud();
+    sfx.unlock();
+    if (s.chest) {
+      gate.panel.visible = false;
+      game.chests++;
+      setCount(game.count + s.chest.n);
+      game.coinsRun += s.chest.coins;
+      ui.runCoins.textContent = fmt(game.coinsRun);
+      burst(gate.x, 1.3, pair.z, 34, [sparkMats.fire[0], sparkMats.fire[2], sparkMats.heal], 6, [0.08, 0.2]);
+      popAt(t('chest.open', { n: s.chest.n, c: s.chest.coins }), gate.x, 2.2, pair.z, 'gun');
+      ringWave(gate.x, pair.z, 0xffbe2e);
+      hitStop(0.06);
+      buzz([20, 30, 20]);
+      track('chest', { level: game.level });
+      return;
+    }
+  }
   gate.panel.visible = false;
   const tone = gateLabel(gate, pair.kind).tone;
-  const confetti = tone === 'good' ? [sparkMats.ally, sparkMats.fire[2]] : tone === 'gun' ? sparkMats.fire : [sparkMats.enemy, sparkMats.barrel];
+  const confetti = tone === 'good' || tone === 'lock' ? [sparkMats.ally, sparkMats.fire[2]] : tone === 'gun' ? sparkMats.fire : [sparkMats.enemy, sparkMats.barrel];
   burst(gate.x, 1.3, pair.z, 26, confetti, 5, [0.08, 0.18]);
+  ringWave(gate.x, pair.z, tone === 'bad' ? 0xe8453c : tone === 'gun' ? 0xff9628 : 0x4f95ff);
+  shatterPanel(gate, pair.z, tone);
   flash(tone === 'bad' ? 'bad' : 'good');
-  const s = gate.spec;
   const wasMystery = s.op === '?';
   let good = true;
   if (pair.kind === 'weapon') {
-    if (s.kind === 'rate') game.rate *= 1 + s.val;
-    else game.dmg *= 1 + s.val;
+    if (s.kind === 'rate') game.buffRate *= 1 + s.val;
+    else game.buffDmg *= 1 + s.val;
+    recalcGun();
     good = s.val > 0;
     popup(`${t(s.kind === 'rate' ? 'gate.rate' : 'gate.dmg').toLocaleLowerCase(getLang())} ${s.label}`, good ? 'gun' : 'bad');
   } else {
@@ -1998,11 +2720,17 @@ function applyGate(pair) {
     else setCount(game.count + Math.round(gate.value));
     good = game.count >= before;
     const diff = Math.round(game.count - before);
-    popup(`${wasMystery ? '? ' : ''}${diff >= 0 ? `+${fmt(diff)}` : fmt(diff)}`, good ? 'good' : 'bad');
+    popAt(`${wasMystery ? '? ' : ''}${diff >= 0 ? `+${fmt(diff)}` : fmt(diff)}`, gate.x, 2.4, pair.z, good ? 'good' : 'bad', s.op === 'x' ? 1.35 : 1);
+    if (game.plan && game.plan.hand) popup(fmt(game.count), good ? 'good' : 'bad');
   }
   if (good && pair.kind === 'gates') mission('doors');
   if (good) {
-    sfx.gateGood();
+    if (s.op === 'x') {
+      sfx.gateMul(s.val);
+      hitStop(0.05);
+      game.shake = Math.max(game.shake, 0.14);
+      buzz([12, 20, 12]);
+    } else sfx.gateGood();
     buzz(15);
   } else {
     sfx.gateBad();
@@ -2013,13 +2741,18 @@ function applyGate(pair) {
 }
 
 function update(dt) {
-  if (game.mode === 'paused') return;
+  if (game.mode === 'paused' || game.mode === 'shop') return;
+  if (game.mode === 'preview') { updatePreview(dt); return; }
   game.time += dt;
-  const playing = game.mode === 'playing';
+  if (game.cine) updateCine(dt);
+  const playing = game.mode === 'playing' && !game.cine;
+  if (game.pilot && playing) game.pilot(dt); // test hook: the bot steers from inside the loop
+  if (playing) game.runTime += dt;
 
   // ---- forward motion
   let target = RUN.idleSpeed;
-  if (playing) target = boss && boss.z > -BOSS.stopDist ? 0 : RUN.speed;
+  if (playing) target = boss && boss.z > -BOSS.stopDist ? 0 : RUN.speed * (game.mud || 1);
+  if (game.cine) target = 0;
   if (game.mode === 'won' || game.mode === 'lost') target = 0;
   if (game.mode === 'bonus') target = game.bonus.done ? 0 : RUN.speed * 0.85;
   game.speed += (target - game.speed) * Math.min(1, dt * 3);
@@ -2030,6 +2763,7 @@ function update(dt) {
   if (playing || game.mode === 'bonus') {
     const k = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
     if (k) crowd.target = clampX(crowd.target + k * 8 * dt, 0.5);
+    if (crowd.lane) crowd.target = Math.max(crowd.lane[0] + 0.55, Math.min(crowd.lane[1] - 0.55, crowd.target));
   } else if (game.mode === 'home') {
     crowd.target = Math.sin(game.time / 1.6) * 1.2;
   }
@@ -2048,6 +2782,7 @@ function update(dt) {
       else if (ev.type === 'saw') spawnSaws(ev, z);
       else if (ev.type === 'turret') spawnTurret(ev, z);
       else if (ev.type === 'finish') game.finishAt = ev.d;
+      else props.spawn(ev, z);
     }
     ui.progress.style.transform = `scaleX(${Math.min(1, game.traveled / game.plan.length)})`;
   }
@@ -2075,6 +2810,16 @@ function update(dt) {
   const R = crowdRadius();
 
   updateTutorial(dt);
+  props.update(dt, dz, playing);
+  if (game.lossPopT) {
+    game.lossPopT -= dt;
+    if (game.lossPopT <= 0) {
+      popAt(`-${fmt(game.lossAcc)}`, game.lossPopX, 1.6, -0.5, 'bad');
+      game.lossAcc = 0;
+      game.lossPopT = 0;
+    }
+  }
+  if (playing && (game.hudT = (game.hudT || 0) - dt) <= 0) { game.hudT = 0.2; refreshPuzzleHud(); }
 
   // ---- gates
   for (let i = gatePairs.length - 1; i >= 0; i--) {
@@ -2213,6 +2958,9 @@ function update(dt) {
     s.label.position.set(sx / alive, s.fast ? 1.15 : 1.35, s.z - 0.2);
     s.label.userData.set(power, s.tone);
   }
+  for (const h of props.hostages()) {
+    eliteMesh.add(h.x, h.z, 0, 0.95, game.time * 9 + h.phase, 0.35, HOSTAGE_LOOK.helmet, HOSTAGE_LOOK.body);
+  }
   shieldPlates.count = shieldsDrawn;
   shieldPlates.instanceMatrix.needsUpdate = true;
   enemyMesh.end();
@@ -2232,7 +2980,7 @@ function update(dt) {
     if (playing && Math.abs(sw.z) < R + 0.5) {
       let inside = 0;
       for (const u of crowd.units) {
-        const ux = clampX(crowd.x + u.ox);
+        const ux = unitX(u);
         if (Math.abs(ux - sw.x) < sw.r * 0.85 && Math.abs(u.oz - sw.z) < 0.35) inside++;
       }
       if (inside && sw.taken < sw.cap) {
@@ -2286,12 +3034,46 @@ function update(dt) {
       } else if (boss.charge) {
         updateCharge(dt, R);
       } else if (boss.z > -BOSS.stopDist && playing) {
-        if (!boss.contact) boss.z += BOSS.walk * dt;
+        // Bosses with mechanics hold their ground and fight; they only walk in once they run out of patience.
+        const holding = boss.hold !== null && boss.z >= boss.hold;
+        if (!boss.contact && !holding) boss.z += BOSS.walk * dt;
       } else {
         boss.z += dz;
       }
-      if (!boss.charge && !boss.punch) boss.x += (crowd.x * 0.5 - boss.x) * Math.min(1, dt * 0.8);
+      // A boss with a weak point stays in the middle, so lining up under it is the squad's job.
+      const aimX = boss.weak ? 0 : crowd.x * 0.5;
+      if (!boss.charge && !boss.punch) boss.x += (aimX - boss.x) * Math.min(1, dt * 0.8);
       updateShield(dt);
+      if (boss.kind === 'shield' && boss.shieldMesh) boss.shieldMesh.material.opacity = 0.25 + 0.1 * Math.sin(game.time * 10);
+      const fighting = playing && boss.introduced && !game.cine;
+      updateWeak(dt, fighting);
+      if (fighting) {
+        boss.fightT += dt;
+        // Out of patience: it stops holding back and walks in.
+        if (!boss.angry && boss.fightT > boss.limit) {
+          boss.angry = true;
+          boss.hold = null;
+          showBanner(t('boss.angry'));
+          sfx.roar();
+          game.shake = 0.5;
+        }
+        // A swarm boss keeps sending small fast packs; rockets clear them in one go.
+        if (boss.kind === 'swarm') {
+          boss.swarmIn -= dt;
+          if (boss.swarmIn <= 0) {
+            boss.swarmIn = 5;
+            const n = 5 + Math.floor(game.level / 6);
+            spawnSquad({ count: n, hp: 2 + Math.floor(game.level / 15), x: (Math.random() * 2 - 1) * 1.6, fixed: true }, boss.z + 2);
+            popAt(t('boss.swarmWave'), boss.x, 3, boss.z + 2, 'bad');
+          }
+        }
+        if (boss.crit && (game.critT = (game.critT || 0) - dt) <= 0) {
+          popAt(`-${fmt(boss.crit)}`, boss.weakX, 2.6 * boss.scale, boss.z + 1, 'crit');
+          if (boss.crit > boss.max * 0.02) sfx.crit();
+          boss.crit = 0;
+          game.critT = 0.3;
+        }
+      }
       const stomp = game.time * (boss.contact ? 9 : 4);
       if (boss.punch) {
         updatePunch(dt);
@@ -2309,11 +3091,11 @@ function update(dt) {
       if (boss.enraged) boss.mat.emissive.setRGB(0.35 + Math.sin(game.time * 8) * 0.15 + Math.max(0, boss.flash) * 2, 0.02, 0.05);
       if (!boss.introduced && playing && boss.z > -BOSS.stopDist - 3) {
         boss.introduced = true;
-        showBanner(t(boss.week ? 'bw.intro' : boss.big ? 'special.boss' : 'bossFight'));
         setMusicIntensity(2);
         sfx.roar();
         game.shake = 0.4;
         buzz(80);
+        startCine();
       }
       if (playing && !boss.charge && boss.z > -R - (boss.big ? 1.9 : 1.1)) {
         boss.contact = true;
@@ -2331,13 +3113,14 @@ function update(dt) {
       const inReach = boss.z > -punchReach() + 0.6;
       // The fight opens with a leap: the boss jumps at the army with its fists raised
       // and smashes down where it lands. The red zone shows the landing spot.
-      if (playing && !boss.charge && !boss.leapt && !boss.punch && boss.z > -24) startLeap();
-      if (playing && !boss.charge && inReach) {
+      const canAttack = playing && boss.introduced && !game.cine;
+      if (canAttack && !boss.charge && !boss.leapt && !boss.punch && boss.z > -24) startLeap();
+      if (canAttack && !boss.charge && inReach) {
         if (!boss.punch) {
           boss.punchIn = (boss.punchIn ?? 0.3) - dt;
           if (boss.punchIn <= 0) startPunch();
         }
-      } else if (playing && !boss.charge && !boss.punch && boss.z > -BOSS.slamRange) {
+      } else if (canAttack && !boss.charge && !boss.punch && boss.z > -BOSS.slamRange) {
         boss.slamIn -= dt;
         if (boss.slamIn <= 0) {
           boss.slamIn = Math.max(BOSS.slamMin, BOSS.slamEvery - game.level * 0.08) * (boss.big ? 0.75 : 1) * (boss.enraged ? 0.75 : 1);
@@ -2346,6 +3129,9 @@ function update(dt) {
       }
       if (boss.hp <= 0 && playing) {
         boss.dead = true;
+        game.bossSecs = boss.fightT;
+        finishRun(true);
+        if (boss.marker) boss.marker.visible = false;
         for (const sl of slams) trash(sl.group, sl.rock);
         slams = [];
         if (boss.punch) { trash(boss.punch.zone); boss.punch = null; }
@@ -2356,8 +3142,10 @@ function update(dt) {
         sfx.boom();
         game.shake = 0.6;
         boss.group.visible = false;
+        hitStop(0.16);
         game.slowmo = 1.3;
         sfx.bigBoom();
+        celebrate();
         mission('boss');
         if (boss.big && !boss.week) bump('worldBosses');
         flash('good');
@@ -2377,7 +3165,7 @@ function update(dt) {
       w.hit = true;
       const units = crowd.units;
       let inside = 0;
-      for (const u of units) if (Math.abs(clampX(crowd.x + u.ox) - w.gapX) > w.gapHalf) inside++;
+      for (const u of units) if (Math.abs(unitX(u) - w.gapX) > w.gapHalf) inside++;
       if (inside && units.length) {
         const loss = Math.max(1, Math.round(game.count * (inside / units.length) * 0.5));
         setCount(game.count - loss);
@@ -2442,7 +3230,7 @@ function update(dt) {
       for (let k = 0; k < w.pellets; k++) {
         const spread = w.pellets > 1 ? ((k / (w.pellets - 1)) * 2 - 1) * w.spread : rand(-1, 1) * w.spread;
         bullets.push({
-          x: clampX(crowd.x + u.ox) + 0.12, z: u.oz - 0.3, dmg: perPellet, vx: spread * GUN.bulletSpeed * 0.25, range: w.range,
+          x: unitX(u) + 0.12, z: u.oz - 0.3, dmg: perPellet, vx: spread * GUN.bulletSpeed * 0.25, range: w.range,
           speed: w.speed || 1, shield: w.shield, splash: w.splash,
         });
       }
@@ -2460,18 +3248,8 @@ function update(dt) {
     if (dead) bullets.splice(i, 1);
   }
 
-  // ---- draw crowd
-  const units = crowd.units;
-  allyMesh.begin();
-  for (let i = 0; i < units.length; i++) {
-    const u = units[i];
-    const k = 1 - Math.exp(-8 * dt);
-    u.ox += (u.tx - u.ox) * k;
-    u.oz += (u.tz - u.oz) * k;
-    const x = clampX(crowd.x + u.ox);
-    allyMesh.add(x, u.oz, 0, 1, game.time * 12 + u.phase, Math.min(1, game.speed / 4));
-  }
-  allyMesh.end();
+  drawCrowd(dt);
+  updateFx(dt, dz);
 
   countLabel.visible = game.mode !== 'home' && game.mode !== 'won' && game.count > 0;
   countLabel.position.set(crowd.x, 1.0 + R * 0.35, -R * 0.2);
@@ -2512,7 +3290,7 @@ function update(dt) {
     u.v.y -= 18 * dt;
     m.position.addScaledVector(u.v, dt);
     m.position.z += dz;
-    if (m.position.y < 0) {
+    if (m.position.y < 0 && !u.fall) {
       m.position.y = 0;
       u.v.y *= -0.3;
       u.v.x *= 0.6;
@@ -2551,7 +3329,11 @@ function update(dt) {
     game.endTimer += dt;
     if (game.endTimer > 1.1 && ui.won.hidden && ui.lost.hidden) {
       show(game.mode === 'won' ? ui.won : ui.lost);
-      if (game.mode === 'won') cards.onWonShown((n) => { game.shownBonus += n; refreshWonCoins(game.tripled); });
+      if (game.mode === 'won') {
+        cards.onWonShown((n) => { game.shownBonus += n; refreshWonCoins(game.tripled); });
+        revealStars(game.result ? game.result.stars : 0);
+        $('won-best').hidden = !game.newBest || !game.replay;
+      }
     }
   }
 
@@ -2561,9 +3343,43 @@ function update(dt) {
   game.shake = Math.max(0, game.shake - dt * 1.5);
   const sh = game.shake * game.shake;
   const pull = Math.min(R, 3) * 0.9;
-  camera.position.set(crowd.x * 0.35 + rand(-1, 1) * sh, 6.6 + pull + rand(-1, 1) * sh, 7.4 + pull);
-  lookAt.set(crowd.x * 0.35, camAim, -7.5);
-  camera.lookAt(lookAt);
+  // In a lane split the camera follows the squad further to its side and rises a little,
+  // so both lanes stay in view; during the boss intro it swings round to the boss.
+  const fork = game.inFork ? 1 : 0;
+  game.camFork = (game.camFork || 0) + (fork - (game.camFork || 0)) * Math.min(1, dt * 3);
+  const f = game.camFork;
+  if (game.cine && boss) {
+    const k = Math.min(1, game.cine.t / 0.6) * Math.min(1, (game.cine.dur - game.cine.t) / 0.5);
+    const e = k * k * (3 - 2 * k);
+    camPos.set(crowd.x * 0.35, 6.6 + pull, 7.4 + pull).lerp(tmpV.set(boss.x + 2.6 * boss.scale, 2.2 * boss.scale, boss.z + 6.5 * boss.scale), e);
+    camLook.set(crowd.x * 0.35, camAim, -7.5).lerp(tmpV.set(boss.x, 2.1 * boss.scale, boss.z), e);
+  } else {
+    camPos.set(crowd.x * (0.35 + 0.25 * f), 6.6 + pull + 1.1 * f, 7.4 + pull + 0.6 * f);
+    camLook.set(crowd.x * (0.35 + 0.15 * f), camAim, -7.5 - 1.5 * f);
+  }
+  camera.position.set(camPos.x + rand(-1, 1) * sh, camPos.y + rand(-1, 1) * sh, camPos.z);
+  camera.lookAt(camLook);
+}
+const camPos = new THREE.Vector3();
+const camLook = new THREE.Vector3();
+const tmpV = new THREE.Vector3();
+
+// The squad. After a win they jump for joy for a moment.
+function drawCrowd(dt) {
+  const units = crowd.units;
+  if (game.cheer > 0) game.cheer -= dt;
+  const cheer = Math.max(0, game.cheer || 0);
+  allyMesh.begin();
+  for (let i = 0; i < units.length; i++) {
+    const u = units[i];
+    const k = 1 - Math.exp(-8 * dt);
+    u.ox += (u.tx - u.ox) * k;
+    u.oz += (u.tz - u.oz) * k;
+    const x = unitX(u);
+    const lift = cheer ? Math.abs(Math.sin(game.time * 9 + u.phase)) * 0.45 * Math.min(1, cheer) : 0;
+    allyMesh.add(x, u.oz, cheer ? Math.sin(game.time * 6 + u.phase) * 0.6 : 0, 1, game.time * 12 + u.phase, Math.min(1, game.speed / 4), null, null, lift);
+  }
+  allyMesh.end();
 }
 
 // Runners, splitters and medics: their own body color and size, plus a mark that says what they do.
@@ -2594,12 +3410,25 @@ function bulletHits(b, prevZ) {
   const zMax = prevZ;
   const within = (z, r) => z + r >= zMin && z - r <= zMax;
 
-  if (boss && !boss.dead && Math.abs(b.x - boss.x) < (boss.big ? 2 : 1.25) && within(boss.z, boss.big ? 1.2 : 0.8)) {
-    if (boss.shieldOn) {
+  if (boss && !boss.dead && Math.abs(b.x - boss.x) < (boss.big ? BOSS_RULES.bigBodyHalf : BOSS_RULES.bodyHalf) && within(boss.z, boss.big ? 1.2 : 0.8)) {
+    let dmg = b.dmg;
+    if (boss.kind === 'shield') {
+      // Only a share of each shot gets through the shield; the laser cuts straight through.
+      const share = b.shield ?? BOSS_RULES.shieldBody;
+      dmg *= share;
+      if (share < 1 && Math.random() < 0.25) burst(b.x, 1.2, boss.z + 1.4, 1, sparkMats.fire[2], 3);
+    } else if (boss.shieldOn) {
       burst(b.x, 1.2, boss.z + 1.4, 1, sparkMats.fire[2], 3);
       return true;
     }
-    boss.hp -= b.dmg;
+    if (boss.weak) {
+      if (boss.weakOpen && Math.abs(b.x - boss.weakX) < BOSS_RULES.weakHalf) {
+        dmg *= BOSS_RULES.weak;
+        boss.crit = (boss.crit || 0) + dmg;
+        if (Math.random() < 0.3) burst(boss.weakX, 1.6 * boss.scale, boss.z + 0.9, 2, [sparkMats.fire[0], sparkMats.fire[2]], 4);
+      } else dmg *= BOSS_RULES.armor;
+    }
+    boss.hp -= dmg;
     boss.flash = 0.12;
     return true;
   }
@@ -2648,8 +3477,10 @@ function bulletHits(b, prevZ) {
 
   for (const p of gatePairs) {
     if (p.passed || !within(p.z, 0.15)) continue;
+    // Hand-designed doors are exact: shots fly through them.
+    if (game.plan && game.plan.hand && p.kind === 'gates') continue;
     for (const g of p.gates) {
-      if (Math.abs(b.x - g.x) > g.w / 2) continue;
+      if (!g.spec || Math.abs(b.x - g.x) > g.w / 2) continue;
       if (p.kind === 'gates' && g.spec.op === '+') {
         // The classic: shoot a door to raise its number.
         const gain = 0.32 / Math.sqrt(Math.max(1, game.count));
@@ -2698,7 +3529,10 @@ function frame(now) {
   last = now;
   autoQ.sample(realDt, game.mode === 'playing' || game.mode === 'bonus');
   // Slow motion runs on real time so it always lasts the same.
-  const scale = game.slowmo > 0 ? 0.3 : (game.tutScale || 1);
+  // Hit-stop: a few frames of near-freeze on big hits, on real time.
+  const stop = game.hitstop > 0;
+  game.hitstop = Math.max(0, (game.hitstop || 0) - realDt);
+  const scale = stop ? 0.04 : game.slowmo > 0 ? 0.3 : (game.tutScale || 1);
   game.slowmo = Math.max(0, game.slowmo - dt);
   for (let i = 0; i < game.steps; i++) update(dt * scale);
   renderer.render(scene, camera);
@@ -2919,6 +3753,11 @@ window.__game = { review: () => review.show(), share: () => shareMoment(), cross
   },
   xmasGift: () => season.openGiftIfReady(null),
   bossWeek: () => startLevel('bossweek'),
+  // Puzzle layer, for the bot and screenshot runs.
+  props: () => props.list(), shape: (v) => (v ? setShape(v, true) : game.shape), skipPreview: () => endPreview(),
+  play: (n) => startLevel(null, n), result: () => game.result, plan: () => game.plan, levels: () => openLevels(),
+  shop: () => openRunShop, buy: (i) => { const ev = game.plan.events.find((e) => e.type === 'shop'); if (ev) buyRunOffer(ev.offers[i]); else closeRunShop(); },
+  skipShop: () => closeRunShop(), endCine: () => endCine(), levelDef,
   cards: () => cards,
   album: () => cards.openAlbum(),
   quality: () => ({ tier: autoQ.tier(), fx }),

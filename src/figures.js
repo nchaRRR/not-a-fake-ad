@@ -95,11 +95,12 @@ export class FigureSet {
   }
 
   // x, z: ground position. facing: rotation around y. stride: 0 still, 1 full run.
-  add(x, z, facing, scale, phase, stride, helmetColor = null, bodyColor = null) {
+  // lift: extra height (a jump), 0 on the ground.
+  add(x, z, facing, scale, phase, stride, helmetColor = null, bodyColor = null, lift = 0) {
     if (this.n >= this.drawCap) return;
     const i = this.n++;
     const swing = Math.sin(phase) * 0.75 * stride;
-    const bob = Math.abs(Math.cos(phase)) * 0.05 * stride;
+    const bob = Math.abs(Math.cos(phase)) * 0.05 * stride + lift;
     this._p.set(x, bob, z);
     this._q.setFromAxisAngle(this._up, facing);
     this._s.setScalar(scale);

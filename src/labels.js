@@ -57,7 +57,13 @@ export function makeGatePanel(width, height) {
       // Opaque versions for store art, where the sky behind would wash the colour out.
       goodSolid: ['rgba(47,124,246,0.94)', '#9cc4ff'],
       badSolid: ['rgba(232,69,60,0.94)', '#ffb0a8'],
-    }[tone];
+      // Puzzle signs: a locked door, a target door (waiting / in range / off), a sign board.
+      lock: ['rgba(93,81,114,0.78)', '#ffbe2e'],
+      target: ['rgba(255,190,46,0.9)', '#fff2b8'],
+      hit: ['rgba(43,180,110,0.9)', '#b8ffd9'],
+      off: ['rgba(232,69,60,0.88)', '#ffb0a8'],
+      sign: ['rgba(255,247,239,0.97)', '#2b2140'],
+    }[tone] || ['rgba(47,124,246,0.55)', '#9cc4ff'];
     g.clearRect(0, 0, W, H);
     roundRect(g, 6, 6, W - 12, H - 12, 22);
     g.fillStyle = fills[0];
@@ -65,9 +71,33 @@ export function makeGatePanel(width, height) {
     g.lineWidth = 8;
     g.strokeStyle = fills[1];
     g.stroke();
-    if (sub) {
-      strokeText(g, sub, W / 2, H * 0.3, 34, '#ffffff');
-      strokeText(g, title, W / 2, H * 0.6, 84, '#ffffff');
+    if (sub === '#lock') {
+      // A padlock above the number.
+      const cx = W / 2;
+      const cy = H * 0.3;
+      g.lineWidth = 10;
+      g.strokeStyle = '#2b2140';
+      g.beginPath();
+      g.arc(cx, cy - 6, 18, Math.PI, 0);
+      g.stroke();
+      g.fillStyle = '#ffbe2e';
+      roundRect(g, cx - 28, cy - 8, 56, 42, 9);
+      g.fill();
+      g.lineWidth = 6;
+      g.stroke();
+      g.fillStyle = '#2b2140';
+      g.fillRect(cx - 4, cy + 4, 8, 16);
+      strokeText(g, title, W / 2, H * 0.68, 84, '#ffffff');
+    } else if (sub) {
+      const ink = tone === 'sign';
+      if (ink) {
+        g.font = `800 34px ${FONT}`;
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        g.fillStyle = '#5d5172';
+        g.fillText(sub, W / 2, H * 0.3);
+      } else strokeText(g, sub, W / 2, H * 0.3, 34, '#ffffff');
+      strokeText(g, title, W / 2, H * 0.62, 84, ink ? '#ffbe2e' : '#ffffff');
     } else {
       strokeText(g, title, W / 2, H * 0.5, 104, '#ffffff');
     }
@@ -135,7 +165,12 @@ export function makeFloorLabel(width, depth, text, color) {
   g.fillRect(0, 0, W, H * 0.18);
   g.fillStyle = 'rgba(43,33,64,0.25)';
   g.fillRect(0, H * 0.86, W, H * 0.14);
-  strokeText(g, text, W / 2, H * 0.5, Math.min(H * 0.62, 150), '#ffffff');
+  // Shrink long words so they fit across the tile.
+  let size = Math.min(H * 0.62, 150);
+  g.font = `800 ${size}px ${FONT}`;
+  const wText = g.measureText(text).width;
+  if (wText > W * 0.88) size *= (W * 0.88) / wText;
+  strokeText(g, text, W / 2, H * 0.5, size, '#ffffff');
   tex.needsUpdate = true;
   const mesh = new THREE.Mesh(
     new THREE.PlaneGeometry(width, depth),

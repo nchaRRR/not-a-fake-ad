@@ -139,6 +139,7 @@ export const BOSS_RULES = {
   openShare: 0.45, // share of the fight the weak point is open
   shieldBody: 0.25, // body hits through a shield without a laser
   swarmSoak: 1.7, // fight takes this much longer without splash damage
+  swarmSoakSplash: 1.45, // ... and with it, on a boss with a weak point (measured in the browser bot runs)
   swarmWave: 8, // soldiers lost per add wave without splash damage
   swarmWaveSplash: 3, // ... and with it (measured in the browser bot runs)
   swarmPace: 1.25, // swarm fights run longer still: shots spent on the adds
@@ -155,7 +156,8 @@ export function bossMult(count, shape, boss, weapon) {
   const closed = bodyShare * body;
   const open = weakShare * R.weak + Math.max(0, bodyShare - weakShare) * body;
   const m = (boss.weak ? (1 - R.openShare) * closed + R.openShare * open : bodyShare) * shield;
-  return boss.kind === 'swarm' && !weapon.splash ? m / R.swarmSoak : m;
+  // Adds crowd in front of an open weak point, so even rockets lose the weak-point bonus there.
+  return boss.kind === 'swarm' ? m / (!weapon.splash ? R.swarmSoak : boss.weak ? R.swarmSoakSplash : 1) : m;
 }
 
 // Seconds to beat a boss, and soldiers lost to its adds, for a plan's squad at the boss.
